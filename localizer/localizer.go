@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/deltegui/owl/core"
@@ -24,19 +25,24 @@ func (loc Localizer) Get(key string) string {
 
 type i18n map[string]Localizer
 
-const fallbackLanguage string = "es"
+const (
+	LangSpanish = "es"
+	LangEnglish = "en"
+)
+
+const fallbackLanguage string = LangSpanish
 
 const cookieKey string = "language"
 
 type Store struct {
 	files     embed.FS
 	sharedKey string
-	errorsKey string
+	errorKey  string
 	cypher    core.Cypher
 }
 
-func NewLocalizerStore(files embed.FS, sharedKey, errorsKey string, cypher core.Cypher) Store {
-	return Store{files, sharedKey, errorsKey, cypher}
+func NewLocalizerStore(files embed.FS, sharedKey, errorKey string, cypher core.Cypher) Store {
+	return Store{files, sharedKey, errorKey, cypher}
 }
 
 func (ls Store) loadFile(file string) i18n {
@@ -70,6 +76,17 @@ func (ls Store) Get(key, language string) Localizer {
 	shared := ls.GetWithoutShared(ls.sharedKey, language)
 	mergeLocalizers(loc, shared)
 	return loc
+}
+
+func (ls Store) GetLocalizedError(err core.DomainError, req *http.Request) string {
+	lang := ls.ReadCookie(req)
+	key := strconv.Itoa(int(err.Code))
+	localizer := ls.GetWithoutShared(ls.errorKey, lang)
+	translation, ok := localizer[key]
+	if !ok {
+		return err.Message
+	}
+	return translation
 }
 
 func mergeLocalizers(dst, origin Localizer) {
@@ -127,8 +144,8 @@ func ReadCookie(req *http.Request, cy core.Cypher) (string, error) {
 func CreateCookie(w http.ResponseWriter, localization string, cy core.Cypher) error {
 	lang := fallbackLanguage
 	suppoertedLangauges := []string{
-		"es",
-		"en",
+		LangSpanish,
+		LangEnglish,
 	}
 	for _, supported := range suppoertedLangauges {
 		if localization == supported {

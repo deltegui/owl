@@ -11,7 +11,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/deltegui/owl/core"
 	"github.com/deltegui/owl/localizer"
+	"github.com/deltegui/valtruc"
 
 	"github.com/julienschmidt/httprouter"
 )
@@ -22,27 +24,35 @@ type Middleware func(next Handler) Handler
 
 type Mux struct {
 	router   *httprouter.Router
+	cypher   core.Cypher
 	locStore *localizer.Store
+
+	middlewares []Middleware
 }
 
-func New(conf Config) *Mux {
+func New(cy core.Cypher) *Mux {
 	return &Mux{
 		router:   httprouter.New(),
-		locStore: conf.newLocalizerStore(),
+		locStore: nil,
+		cypher:   cy,
 	}
 }
 
 func (mux *Mux) createContext(w http.ResponseWriter, req *http.Request, params httprouter.Params) Ctx {
 	return Ctx{
-		Req:      req,
-		Res:      w,
-		params:   params,
-		ctx:      context.Background(),
-		locstore: mux.locStore,
+		Req:       req,
+		Res:       w,
+		params:    params,
+		ctx:       context.Background(),
+		locstore:  mux.locStore,
+		validator: valtruc.New(),
 	}
 }
 
 func (mux *Mux) Handle(method string, pattern string, handler Handler) {
+	for _, m := range mux.middlewares {
+		handler = m(handler)
+	}
 	mux.router.Handle(method, pattern, func(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
 		ctx := mux.createContext(w, req, params)
 		handler(ctx)
@@ -79,6 +89,22 @@ func (mux *Mux) Put(pattern string, handler Handler) {
 
 func (mux *Mux) Trace(pattern string, handler Handler) {
 	mux.Handle(http.MethodTrace, pattern, handler)
+}
+
+func (mux *Mux) Static(path string) {
+	mux.router.NotFound = http.FileServer(http.Dir(path))
+}
+
+func (mux *Mux) StaticEmbedded(fs embed.FS) {
+	mux.router.NotFound = http.FileServer(http.FS(fs))
+}
+
+func (mux *Mux) StaticMount(url, path string) {
+	mux.router.ServeFiles(fmt.Sprintf("%s/*filepath", url), http.Dir(path))
+}
+
+func (mux *Mux) StaticMountEmbedded(url string, fs embed.FS) {
+	mux.router.ServeFiles(fmt.Sprintf("%s/*filepath", url), http.FS(fs))
 }
 
 func startServer(server *http.Server) {
@@ -119,12 +145,19 @@ func (mux Mux) Listen(address string) {
 	waitAndStopServer(&server)
 }
 
-func Redirect(to string) func() Handler {
-	return func() Handler {
-		return func(c Ctx) error {
-			http.RedirectHandler(to, http.StatusTemporaryRedirect).ServeHTTP(c.Res, c.Req)
-			return nil
-		}
+func (mux *Mux) AddLocalization(fs embed.FS, sharedKey, errorKey string) {
+	store := localizer.NewLocalizerStore(fs, sharedKey, errorKey, mux.cypher)
+	mux.locStore = &store
+}
+
+func (mux *Mux) Use(middleware Middleware) {
+	mux.middlewares = append(mux.middlewares, middleware)
+}
+
+func Redirect(to string) Handler {
+	return func(c Ctx) error {
+		http.RedirectHandler(to, http.StatusTemporaryRedirect).ServeHTTP(c.Res, c.Req)
+		return nil
 	}
 }
 

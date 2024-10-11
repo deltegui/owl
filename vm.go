@@ -11,7 +11,7 @@ import (
 type ViewModel struct {
 	Model      interface{}
 	Localizer  localizer.Localizer
-	FormErrors map[string][]core.ValidationError
+	ModelState core.ModelState
 	CsrfToken  string
 	Ctx        Ctx
 }
@@ -23,10 +23,11 @@ func createViewModel(ctx Ctx, name string, model any) ViewModel {
 		csrfToken = ""
 	}
 	return ViewModel{
-		Model:     model,
-		CsrfToken: csrfToken,
-		Localizer: loc,
-		Ctx:       ctx,
+		Model:      model,
+		CsrfToken:  csrfToken,
+		Localizer:  loc,
+		ModelState: ctx.ModelState,
+		Ctx:        ctx,
 	}
 }
 
@@ -34,19 +35,23 @@ func (vm ViewModel) Localize(key string) string {
 	return vm.Localizer.Get(key)
 }
 
+func (vm ViewModel) LocalizeError(err core.DomainError) string {
+	return vm.Ctx.LocalizeError(err)
+}
+
 func (vm ViewModel) HaveFormError(key string) bool {
-	if vm.FormErrors == nil {
+	if vm.ModelState.Valid {
 		return false
 	}
-	_, ok := vm.FormErrors[key]
+	_, ok := vm.ModelState.Errors[key]
 	return ok
 }
 
 func (vm ViewModel) GetFormError(key string) string {
-	if vm.FormErrors == nil {
+	if vm.ModelState.Valid {
 		return ""
 	}
-	val, ok := vm.FormErrors[key]
+	val, ok := vm.ModelState.Errors[key]
 	if !ok {
 		return ""
 	}
@@ -58,7 +63,7 @@ func (vm ViewModel) GetFormError(key string) string {
 
 func (vm ViewModel) formatError(key string, err core.ValidationError) string {
 	log.Println("Error:", err)
-	locVal := vm.Localize(err.GetName())
+	locVal := vm.Localize(string(err.GetIdentifier()))
 	log.Println("locVal format error", locVal)
 	finalVal := err.Format(locVal)
 	log.Println(finalVal)
@@ -68,10 +73,10 @@ func (vm ViewModel) formatError(key string, err core.ValidationError) string {
 
 func (vm ViewModel) GetAllFormErrors(key string) []string {
 	output := []string{}
-	if vm.FormErrors == nil {
+	if vm.ModelState.Valid {
 		return output
 	}
-	val, ok := vm.FormErrors[key]
+	val, ok := vm.ModelState.Errors[key]
 	if !ok {
 		return output
 	}

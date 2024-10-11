@@ -1,6 +1,10 @@
 package core
 
-import "time"
+import (
+	"time"
+
+	"github.com/deltegui/valtruc"
+)
 
 const (
 	Size64 int = 64
@@ -32,10 +36,32 @@ const (
 	RoleUser  Role = 2
 )
 
+type ModelState struct {
+	Valid  bool
+	Errors map[string][]ValidationError
+}
+
 type ValidationError interface {
 	Error() string
 	Format(f string) string
-	GetName() string
+	GetStructName() string
+	GetFieldName() string
+	GetFieldTypeName() string
+	GetFieldValue() string
+	GetIdentifier() valtruc.ValidatorIdentifier
 }
 
 type Validator func(interface{}) map[string][]ValidationError
+
+type DomainError struct {
+	Code    int
+	Message string
+}
+
+func (err DomainError) Error() string {
+	return err.Message
+}
+
+func (err DomainError) IsPresent() bool {
+	return err.Code != 0
+}
