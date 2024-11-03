@@ -93,10 +93,8 @@ func (ctx Ctx) JsonOk(data any) error {
 }
 
 func (ctx Ctx) String(status int, data string, a ...any) error {
+	ctx.Res.WriteHeader(status)
 	fmt.Fprintf(ctx.Res, data, a...)
-	if status != http.StatusOK {
-		ctx.Res.WriteHeader(status)
-	}
 	return nil
 }
 
@@ -174,6 +172,10 @@ func (ctx Ctx) HaveSession() bool {
 
 func (ctx Ctx) GetUser() session.User {
 	return ctx.Get(session.ContextKey).(session.User)
+}
+
+func (ctx *Ctx) GetCurrentLanguage() string {
+	return ctx.locstore.ReadCookie(ctx.Req)
 }
 
 func (ctx *Ctx) ChangeLanguage(to string) error {

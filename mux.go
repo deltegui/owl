@@ -49,8 +49,11 @@ func (mux *Mux) createContext(w http.ResponseWriter, req *http.Request, params h
 	}
 }
 
-func (mux *Mux) Handle(method string, pattern string, handler Handler) {
+func (mux *Mux) Handle(method string, pattern string, handler Handler, middlewares ...Middleware) {
 	for _, m := range mux.middlewares {
+		handler = m(handler)
+	}
+	for _, m := range middlewares {
 		handler = m(handler)
 	}
 	mux.router.Handle(method, pattern, func(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
@@ -59,36 +62,36 @@ func (mux *Mux) Handle(method string, pattern string, handler Handler) {
 	})
 }
 
-func (mux *Mux) Get(pattern string, handler Handler) {
-	mux.Handle(http.MethodGet, pattern, handler)
+func (mux *Mux) Get(pattern string, handler Handler, middlewares ...Middleware) {
+	mux.Handle(http.MethodGet, pattern, handler, middlewares...)
 }
 
-func (mux *Mux) Post(pattern string, handler Handler) {
-	mux.Handle(http.MethodPost, pattern, handler)
+func (mux *Mux) Post(pattern string, handler Handler, middlewares ...Middleware) {
+	mux.Handle(http.MethodPost, pattern, handler, middlewares...)
 }
 
-func (mux *Mux) Patch(pattern string, handler Handler) {
-	mux.Handle(http.MethodPatch, pattern, handler)
+func (mux *Mux) Patch(pattern string, handler Handler, middlewares ...Middleware) {
+	mux.Handle(http.MethodPatch, pattern, handler, middlewares...)
 }
 
-func (mux *Mux) Delete(pattern string, handler Handler) {
-	mux.Handle(http.MethodDelete, pattern, handler)
+func (mux *Mux) Delete(pattern string, handler Handler, middlewares ...Middleware) {
+	mux.Handle(http.MethodDelete, pattern, handler, middlewares...)
 }
 
-func (mux *Mux) Head(pattern string, handler Handler) {
-	mux.Handle(http.MethodHead, pattern, handler)
+func (mux *Mux) Head(pattern string, handler Handler, middlewares ...Middleware) {
+	mux.Handle(http.MethodHead, pattern, handler, middlewares...)
 }
 
-func (mux *Mux) Options(pattern string, handler Handler) {
-	mux.Handle(http.MethodOptions, pattern, handler)
+func (mux *Mux) Options(pattern string, handler Handler, middlewares ...Middleware) {
+	mux.Handle(http.MethodOptions, pattern, handler, middlewares...)
 }
 
-func (mux *Mux) Put(pattern string, handler Handler) {
-	mux.Handle(http.MethodPut, pattern, handler)
+func (mux *Mux) Put(pattern string, handler Handler, middlewares ...Middleware) {
+	mux.Handle(http.MethodPut, pattern, handler, middlewares...)
 }
 
-func (mux *Mux) Trace(pattern string, handler Handler) {
-	mux.Handle(http.MethodTrace, pattern, handler)
+func (mux *Mux) Trace(pattern string, handler Handler, middlewares ...Middleware) {
+	mux.Handle(http.MethodTrace, pattern, handler, middlewares...)
 }
 
 func (mux *Mux) Static(path string) {

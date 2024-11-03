@@ -2,9 +2,11 @@ package owl
 
 import (
 	"fmt"
+	"html/template"
 	"log"
 
 	"github.com/deltegui/owl/core"
+	"github.com/deltegui/owl/csrf"
 	"github.com/deltegui/owl/localizer"
 )
 
@@ -29,6 +31,10 @@ func createViewModel(ctx Ctx, name string, model any) ViewModel {
 		ModelState: ctx.ModelState,
 		Ctx:        ctx,
 	}
+}
+
+func (vm ViewModel) PlaceCsrfInput() template.HTML {
+	return template.HTML(`<input type="hidden" name="` + csrf.CsrfHeaderName + `" value="` + vm.CsrfToken + `"/>`)
 }
 
 func (vm ViewModel) Localize(key string) string {

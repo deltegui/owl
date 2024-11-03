@@ -47,10 +47,12 @@ func Admin(manager *session.Manager, url string) owl.Middleware {
 		return func(ctx owl.Ctx) error {
 			user, err := manager.ReadSessionCookie(ctx.Req)
 			if err != nil {
+				log.Println("Error while authenticating:", err)
 				handleError(ctx, url)
 				return err
 			}
 			if user.Role != core.RoleAdmin {
+				log.Println("User is not admin!")
 				handleError(ctx, url)
 				return err
 			}
