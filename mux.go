@@ -49,7 +49,7 @@ func (mux *Mux) createContext(w http.ResponseWriter, req *http.Request, params h
 	}
 }
 
-func (mux *Mux) Handle(method string, pattern string, handler Handler, middlewares ...Middleware) {
+func (mux *Mux) Handle(method, pattern string, handler Handler, middlewares ...Middleware) {
 	for _, m := range mux.middlewares {
 		handler = m(handler)
 	}
