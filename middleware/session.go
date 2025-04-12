@@ -4,6 +4,8 @@ import (
 	"log"
 	"net/http"
 
+	"slices"
+
 	"github.com/deltegui/owl"
 	"github.com/deltegui/owl/core"
 	"github.com/deltegui/owl/session"
@@ -31,10 +33,8 @@ func AuthorizeRoles(manager *session.Manager, url string, roles []core.Role) owl
 				handleError(ctx, url)
 				return err
 			}
-			for _, authorizedRol := range roles {
-				if user.Role == authorizedRol {
-					return next(ctx)
-				}
+			if slices.Contains(roles, user.Role) {
+				return next(ctx)
 			}
 			handleError(ctx, url)
 			return nil

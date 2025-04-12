@@ -50,10 +50,10 @@ func (mux *Mux) createContext(w http.ResponseWriter, req *http.Request, params h
 }
 
 func (mux *Mux) Handle(method, pattern string, handler Handler, middlewares ...Middleware) {
-	for _, m := range mux.middlewares {
+	for _, m := range middlewares {
 		handler = m(handler)
 	}
-	for _, m := range middlewares {
+	for _, m := range mux.middlewares {
 		handler = m(handler)
 	}
 	mux.router.Handle(method, pattern, func(w http.ResponseWriter, req *http.Request, params httprouter.Params) {

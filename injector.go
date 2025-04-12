@@ -10,7 +10,7 @@ import (
 // the type that builds. The type cant be func() interface{}
 // cause some errors appears in runtime. So it's represented
 // as an interface.
-type Builder interface{}
+type Builder any
 
 // Runner is any funtion that returns void. It is use
 // as an easy way to ask to the injetor to provide dependencies
@@ -34,7 +34,7 @@ type Builder interface{}
 //	})
 //
 // The callback function will be exectued inmediatly.
-type Runner interface{}
+type Runner any
 
 // Injector is an automated dependency injector inspired in Sping's
 // DI. It will detect which builder to call using its return type.
@@ -65,12 +65,12 @@ func (injector Injector) ShowAvailableBuilders() {
 }
 
 // Get returns a builded dependency.
-func (injector Injector) Get(name interface{}) (interface{}, error) {
+func (injector Injector) Get(name any) (any, error) {
 	return injector.GetByType(reflect.TypeOf(name))
 }
 
 // GetByType returns a builded dependency identified by type.
-func (injector Injector) GetByType(name reflect.Type) (interface{}, error) {
+func (injector Injector) GetByType(name reflect.Type) (any, error) {
 	dependencyBuilder := injector.builders[name]
 	if dependencyBuilder == nil {
 		return nil, fmt.Errorf("builder not found for type %s", name)
@@ -85,7 +85,7 @@ func (injector Injector) ResolveHandler(builder Builder) Handler {
 
 // CallBuilder injecting all parameters with provided builders. If some parameter
 // type cannot be found, it will panic.
-func (injector Injector) CallBuilder(builder Builder) interface{} {
+func (injector Injector) CallBuilder(builder Builder) any {
 	var inputs []reflect.Value
 	builderType := reflect.TypeOf(builder)
 	for i := range builderType.NumIn() {
@@ -103,7 +103,7 @@ func (injector Injector) CallBuilder(builder Builder) interface{} {
 // PopulateStruct fills a struct with the implementations
 // that the injector can create. Make sure you pass a reference and
 // not a value.
-func (injector Injector) PopulateStruct(userStruct interface{}) {
+func (injector Injector) PopulateStruct(userStruct any) {
 	ptrStructValue := reflect.ValueOf(userStruct)
 	structValue := ptrStructValue.Elem()
 	if structValue.Kind() != reflect.Struct {

@@ -51,16 +51,16 @@ func (mux *Muxi) ShowAvailableBuilders() {
 	mux.injector.ShowAvailableBuilders()
 }
 
-func (mux *Muxi) PopulateStruct(s interface{}) {
+func (mux *Muxi) PopulateStruct(s any) {
 	mux.injector.PopulateStruct(s)
 }
 
 func (mux *Muxi) Handle(method, pattern string, builder Builder, middlewares ...Middleware) {
 	handler := mux.injector.ResolveHandler(builder)
-	for _, m := range mux.middlewares {
+	for _, m := range middlewares {
 		handler = m(handler)
 	}
-	for _, m := range middlewares {
+	for _, m := range mux.middlewares {
 		handler = m(handler)
 	}
 	mux.router.Handle(method, pattern, func(w http.ResponseWriter, req *http.Request, params httprouter.Params) {

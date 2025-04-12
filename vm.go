@@ -11,7 +11,7 @@ import (
 )
 
 type ViewModel struct {
-	Model      interface{}
+	Model      any
 	Localizer  localizer.Localizer
 	ModelState core.ModelState
 	CsrfToken  string
@@ -20,7 +20,7 @@ type ViewModel struct {
 
 func createViewModel(ctx Ctx, name string, model any) ViewModel {
 	var loc = ctx.GetLocalizer(name)
-	csrfToken, ok := ctx.Get("phx-csrf").(string)
+	csrfToken, ok := ctx.Get(csrf.ContextKey).(string)
 	if !ok {
 		csrfToken = ""
 	}

@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	"slices"
+
 	"github.com/deltegui/owl"
 )
 
@@ -62,12 +64,7 @@ func (opt CorsOptions) isMethodAllowed(method string) bool {
 	if len(opt.AllowMethods) == 0 || (len(opt.AllowMethods) == 1 && opt.AllowMethods[0] == CorsAny) {
 		return true
 	}
-	for _, allowed := range opt.AllowMethods {
-		if allowed == method {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(opt.AllowMethods, method)
 }
 
 func getHeadersNames(ctx owl.Ctx) []string {

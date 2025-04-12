@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"maps"
 	"net/http"
+	"slices"
 	"strconv"
 	"time"
 
@@ -90,9 +92,7 @@ func (ls Store) GetLocalizedError(err core.DomainError, req *http.Request) strin
 }
 
 func mergeLocalizers(dst, origin Localizer) {
-	for key, val := range origin {
-		dst[key] = val
-	}
+	maps.Copy(dst, origin)
 }
 
 func (ls Store) GetUsingRequest(key string, req *http.Request) Localizer {
@@ -147,11 +147,8 @@ func CreateCookie(w http.ResponseWriter, localization string, cy core.Cypher) er
 		LangSpanish,
 		LangEnglish,
 	}
-	for _, supported := range suppoertedLangauges {
-		if localization == supported {
-			lang = localization
-			break
-		}
+	if slices.Contains(suppoertedLangauges, localization) {
+		lang = localization
 	}
 	log.Printf("Creating language cookie for lang; '%s'", lang)
 	encode, err := cypher.EncodeCookie(cy, lang)

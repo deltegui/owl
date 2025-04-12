@@ -51,7 +51,7 @@ type ValidationError interface {
 	GetIdentifier() valtruc.ValidatorIdentifier
 }
 
-type Validator func(interface{}) map[string][]ValidationError
+type Validator func(any) map[string][]ValidationError
 
 type DomainError struct {
 	Code    int
