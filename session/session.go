@@ -18,7 +18,7 @@ type Id string
 type User struct {
 	Id    int64
 	Name  string
-	Role  core.Role
+	Roles []core.Role
 	Image string
 }
 

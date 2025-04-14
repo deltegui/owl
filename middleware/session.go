@@ -33,8 +33,10 @@ func AuthorizeRoles(manager *session.Manager, url string, roles []core.Role) owl
 				handleError(ctx, url)
 				return err
 			}
-			if slices.Contains(roles, user.Role) {
-				return next(ctx)
+			for _, userRole := range user.Roles {
+				if slices.Contains(roles, userRole) {
+					return next(ctx)
+				}
 			}
 			handleError(ctx, url)
 			return nil
@@ -51,7 +53,7 @@ func Admin(manager *session.Manager, url string) owl.Middleware {
 				handleError(ctx, url)
 				return err
 			}
-			if user.Role != core.RoleAdmin {
+			if slices.Contains(user.Roles, core.RoleAdmin) {
 				log.Println("User is not admin!")
 				handleError(ctx, url)
 				return err
