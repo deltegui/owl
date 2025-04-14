@@ -40,6 +40,7 @@ func (mux *Muxi) createContext(w http.ResponseWriter, req *http.Request, params 
 		ctx:       context.Background(),
 		locstore:  mux.locStore,
 		validator: valtruc.New(),
+		cypher:    mux.cypher,
 	}
 }
 
