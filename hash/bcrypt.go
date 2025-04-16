@@ -9,9 +9,11 @@ import (
 // BcryptHasher is an implementation of a users Hasher that use Bcrypt.
 type BcryptHasher struct{}
 
+const DefaultCost int = 12
+
 // Hash a password using bcrypt and returns the result.
 func (hasher BcryptHasher) Hash(password string) string {
-	rawResult, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	rawResult, err := bcrypt.GenerateFromPassword([]byte(password), DefaultCost)
 	if err != nil {
 		log.Fatal(err)
 	}
