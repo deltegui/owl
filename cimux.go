@@ -16,7 +16,7 @@ import (
 type Muxi struct {
 	router   *httprouter.Router
 	cypher   core.Cypher
-	locStore *localizer.Store
+	locStore *localizer.WebStore
 
 	injector *Injector
 
@@ -128,7 +128,7 @@ func (mux Muxi) Listen(address string) {
 }
 
 func (mux *Muxi) AddLocalization(fs embed.FS, sharedKey, errorKey string) {
-	store := localizer.NewLocalizerStore(fs, sharedKey, errorKey, mux.cypher)
+	store := localizer.NewWebLocalizerStore(fs, sharedKey, errorKey, mux.cypher)
 	mux.locStore = &store
 }
 

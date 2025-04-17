@@ -37,14 +37,11 @@ const fallbackLanguage string = LangSpanish
 const cookieKey string = "language"
 
 type Store struct {
-	files     embed.FS
-	sharedKey string
-	errorKey  string
-	cypher    core.Cypher
+	files embed.FS
 }
 
-func NewLocalizerStore(files embed.FS, sharedKey, errorKey string, cypher core.Cypher) Store {
-	return Store{files, sharedKey, errorKey, cypher}
+func NewLocalizerStore(files embed.FS) Store {
+	return Store{files}
 }
 
 func (ls Store) loadFile(file string) i18n {
@@ -59,7 +56,7 @@ func (ls Store) loadFile(file string) i18n {
 	return values
 }
 
-func (ls Store) GetWithoutShared(key, language string) Localizer {
+func (ls Store) Get(key, language string) Localizer {
 	log.Println("Loading localization with key", key)
 	key = fmt.Sprintf("%s.json", key)
 	values := ls.loadFile(key)
@@ -73,17 +70,35 @@ func (ls Store) GetWithoutShared(key, language string) Localizer {
 	return val
 }
 
-func (ls Store) Get(key, language string) Localizer {
-	loc := ls.GetWithoutShared(key, language)
-	shared := ls.GetWithoutShared(ls.sharedKey, language)
+func (ls Store) LoadIntoField(field **Localizer, key string, language string) {
+	if *field == nil {
+		localizer := ls.Get(key, language)
+		*field = &localizer
+	}
+}
+
+type WebStore struct {
+	Store
+	sharedKey string
+	errorKey  string
+	cypher    core.Cypher
+}
+
+func NewWebLocalizerStore(files embed.FS, sharedKey, errorKey string, cypher core.Cypher) WebStore {
+	return WebStore{Store{files}, sharedKey, errorKey, cypher}
+}
+
+func (ws WebStore) Get(key, language string) Localizer {
+	loc := ws.Store.Get(key, language)
+	shared := ws.Store.Get(ws.sharedKey, language)
 	mergeLocalizers(loc, shared)
 	return loc
 }
 
-func (ls Store) GetLocalizedError(err core.DomainError, req *http.Request) string {
-	lang := ls.ReadCookie(req)
+func (ws WebStore) GetLocalizedError(err core.DomainError, req *http.Request) string {
+	lang := ws.ReadCookie(req)
 	key := strconv.Itoa(int(err.Code))
-	localizer := ls.GetWithoutShared(ls.errorKey, lang)
+	localizer := ws.Store.Get(ws.errorKey, lang)
 	translation, ok := localizer[key]
 	if !ok {
 		return err.Message
@@ -95,34 +110,27 @@ func mergeLocalizers(dst, origin Localizer) {
 	maps.Copy(dst, origin)
 }
 
-func (ls Store) GetUsingRequest(key string, req *http.Request) Localizer {
-	lang := ls.ReadCookie(req)
-	return ls.Get(key, lang)
+func (ws WebStore) GetUsingRequest(key string, req *http.Request) Localizer {
+	lang := ws.ReadCookie(req)
+	return ws.Get(key, lang)
 }
 
-func (ls Store) GetUsingRequestWithoutShared(key string, req *http.Request) Localizer {
-	lang := ls.ReadCookie(req)
-	return ls.GetWithoutShared(key, lang)
+func (ws WebStore) GetUsingRequestWithoutShared(key string, req *http.Request) Localizer {
+	lang := ws.ReadCookie(req)
+	return ws.Store.Get(key, lang)
 }
 
-func (ls Store) LoadIntoField(field **Localizer, key string, language string) {
-	if *field == nil {
-		localizer := ls.Get(key, language)
-		*field = &localizer
-	}
+func (ws WebStore) LoadIntoFieldUsingRequest(field **Localizer, key string, req *http.Request) {
+	lang := ws.ReadCookie(req)
+	ws.LoadIntoField(field, key, lang)
 }
 
-func (ls Store) LoadIntoFieldUsingRequest(field **Localizer, key string, req *http.Request) {
-	lang := ls.ReadCookie(req)
-	ls.LoadIntoField(field, key, lang)
+func (ws WebStore) CreateCookie(w http.ResponseWriter, localization string) error {
+	return CreateCookie(w, localization, ws.cypher)
 }
 
-func (ls Store) CreateCookie(w http.ResponseWriter, localization string) error {
-	return CreateCookie(w, localization, ls.cypher)
-}
-
-func (ls Store) ReadCookie(req *http.Request) string {
-	lang, err := ReadCookie(req, ls.cypher)
+func (ws WebStore) ReadCookie(req *http.Request) string {
+	lang, err := ReadCookie(req, ws.cypher)
 	if err != nil {
 		return fallbackLanguage
 	}

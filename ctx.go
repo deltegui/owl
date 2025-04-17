@@ -25,7 +25,7 @@ type Ctx struct {
 
 	ModelState core.ModelState
 	validator  valtruc.Valtruc
-	locstore   *localizer.Store
+	locstore   *localizer.WebStore
 	cypher     core.Cypher
 }
 

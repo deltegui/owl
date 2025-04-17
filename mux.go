@@ -25,7 +25,7 @@ type Middleware func(next Handler) Handler
 type Mux struct {
 	router   *httprouter.Router
 	cypher   core.Cypher
-	locStore *localizer.Store
+	locStore *localizer.WebStore
 
 	middlewares []Middleware
 }
@@ -150,7 +150,7 @@ func (mux Mux) Listen(address string) {
 }
 
 func (mux *Mux) AddLocalization(fs embed.FS, sharedKey, errorKey string) {
-	store := localizer.NewLocalizerStore(fs, sharedKey, errorKey, mux.cypher)
+	store := localizer.NewWebLocalizerStore(fs, sharedKey, errorKey, mux.cypher)
 	mux.locStore = &store
 }
 
