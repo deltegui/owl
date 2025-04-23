@@ -1,7 +1,6 @@
 package csrf
 
 import (
-	"crypto/rand"
 	"fmt"
 	"log"
 	"net/http"
@@ -44,13 +43,12 @@ func (csrf *Csrf) decrypt(token string) (string, error) {
 	return decoded, nil
 }
 
+const tokenDelimiter string = "::"
+
 func (csrf Csrf) Generate() string {
 	unixTime := time.Now().Unix()
-	prime, err := rand.Prime(rand.Reader, core.Size64)
-	if err != nil {
-		log.Panicln(err)
-	}
-	raw := fmt.Sprintf("%d//00//%d", prime.Int64(), unixTime)
+	random := core.GenerateToken(core.Size64)
+	raw := fmt.Sprintf("%s%s%d", random, tokenDelimiter, unixTime)
 	e := csrf.encrypt(raw)
 	return e
 }
@@ -61,13 +59,13 @@ func (csrf Csrf) Check(token string) bool {
 		log.Println("Cannot decrypt csrf token: ", err)
 		return false
 	}
-	parts := strings.Split(raw, "//00//")
+	parts := strings.Split(raw, tokenDelimiter)
 	const minimumParts = 2
 	if len(parts) < minimumParts {
 		log.Println("Malformed csrf token. Not enough parts.")
 		return false
 	}
-	unixTime := parts[0]
+	unixTime := parts[1]
 	i, err := strconv.ParseInt(unixTime, core.IntBase10, core.Size64)
 	if err != nil {
 		log.Println("Malformed csrf token. Unixtime is not int64.")
@@ -82,6 +80,10 @@ func (csrf Csrf) Check(token string) bool {
 }
 
 func (csrf Csrf) CheckRequest(req *http.Request) bool {
+	if req.Method == http.MethodGet || req.Method == http.MethodHead {
+		return true
+	}
+
 	token := req.FormValue(CsrfHeaderName)
 	if len(token) == 0 {
 		token = req.Header.Get(CsrfHeaderName)

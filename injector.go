@@ -52,7 +52,7 @@ func NewInjector() *Injector {
 }
 
 // Add a builder to the dependency injector.
-func (injector Injector) Add(builder Builder) {
+func (injector *Injector) Add(builder Builder) {
 	outputType := reflect.TypeOf(builder).Out(0)
 	injector.builders[outputType] = builder
 }

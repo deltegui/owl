@@ -1,7 +1,6 @@
 package owl
 
 import (
-	"context"
 	"embed"
 	"fmt"
 	"net/http"
@@ -37,7 +36,7 @@ func (mux *Muxi) createContext(w http.ResponseWriter, req *http.Request, params 
 		Req:       req,
 		Res:       w,
 		params:    params,
-		ctx:       context.Background(),
+		ctx:       req.Context(),
 		locstore:  mux.locStore,
 		validator: valtruc.New(),
 		cypher:    mux.cypher,

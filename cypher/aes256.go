@@ -17,16 +17,20 @@ type AES256 struct {
 	cipher cipher.AEAD
 }
 
-func GenerateRandomPass() []byte {
+func GenerateRandomPass() ([]byte, error) {
 	bytes := make([]byte, core.Size32) // generate a random 32 byte key for AES-256
 	if _, err := rand.Read(bytes); err != nil {
-		log.Fatalln("Cannot generate random key for aes encryptation in CSRF", err)
+		return bytes, fmt.Errorf("failed to generate random key for AES: %w", err)
 	}
-	return bytes
+	return bytes, nil
 }
 
-func GenerateRandomPassAsString() string {
-	return base64.RawStdEncoding.EncodeToString(GenerateRandomPass())
+func GenerateRandomPassAsString() (string, error) {
+	bytes, err := GenerateRandomPass()
+	if err != nil {
+		return "", err
+	}
+	return base64.RawStdEncoding.EncodeToString(bytes), nil
 }
 
 func generateCipher(pass []byte) cipher.AEAD {
@@ -45,8 +49,12 @@ func generateCipher(pass []byte) cipher.AEAD {
 }
 
 func New() core.Cypher {
+	bytes, err := GenerateRandomPass()
+	if err != nil {
+		log.Fatalln("Cannot create cypher: ", err)
+	}
 	return AES256{
-		cipher: generateCipher(GenerateRandomPass()),
+		cipher: generateCipher(bytes),
 	}
 }
 

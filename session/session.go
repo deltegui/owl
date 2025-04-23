@@ -1,7 +1,6 @@
 package session
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"log"
@@ -53,17 +52,24 @@ func NewMemoryStore() *MemoryStore {
 func (store *MemoryStore) Save(entry Entry) {
 	store.mutex.Lock()
 	store.values[entry.Id] = entry
+	store.recollectGarbage()
 	store.mutex.Unlock()
+}
+
+func (store *MemoryStore) recollectGarbage() {
+	for key, entry := range store.values {
+		if !entry.IsValid() {
+			delete(store.values, key)
+		}
+	}
 }
 
 func (store *MemoryStore) Get(id Id) (Entry, error) {
 	store.mutex.Lock()
-	log.Println("[MemoryStore] number of sessions", len(store.values))
-	for key := range store.values {
-		log.Println("[MemoryStore] Available id : ", key)
-	}
+	store.recollectGarbage()
 	entry, ok := store.values[id]
 	store.mutex.Unlock()
+
 	if !ok {
 		return Entry{}, fmt.Errorf("no session entry for id '%s'", id)
 	}
@@ -78,30 +84,30 @@ func (store *MemoryStore) Delete(id Id) {
 
 type Manager struct {
 	store           SessionStore
-	hasher          core.Hasher
 	timeoutDuration time.Duration
 	cypher          core.Cypher
+	secure          bool
 }
 
-func NewManager(store SessionStore, hasher core.Hasher, duration time.Duration, cypher core.Cypher) *Manager {
+func NewManager(store SessionStore, duration time.Duration, cypher core.Cypher, secure bool) *Manager {
 	return &Manager{
 		store:           store,
-		hasher:          hasher,
 		timeoutDuration: duration,
 		cypher:          cypher,
+		secure:          secure,
 	}
 }
 
-func NewInMemoryManager(hasher core.Hasher, duration time.Duration, cypher core.Cypher) *Manager {
+func NewInMemoryManager(duration time.Duration, cypher core.Cypher, secure bool) *Manager {
 	return NewManager(
 		NewMemoryStore(),
-		hasher,
 		duration,
-		cypher)
+		cypher,
+		secure)
 }
 
 func (manager *Manager) Add(user User) Entry {
-	id := manager.createSessionId(user)
+	id := manager.createSessionId()
 	entry := Entry{
 		Id:      id,
 		User:    user,
@@ -111,16 +117,8 @@ func (manager *Manager) Add(user User) Entry {
 	return entry
 }
 
-func (manager *Manager) createSessionId(user User) Id {
-	const bits int = 32
-	random, err := rand.Prime(rand.Reader, bits)
-	if err != nil {
-		log.Panicln("Error while creating prime number for session id: ", err)
-	}
-	now := time.Now().UTC().Format(time.ANSIC)
-	str := fmt.Sprintf("%s-%s-%s-%d", random.String(), now, user.Name, user.Id)
-	hash := manager.hasher.Hash(str)
-	return Id(hash)
+func (manager *Manager) createSessionId() Id {
+	return Id(core.GenerateTokenDefaultLength())
 }
 
 func (manager *Manager) Get(id Id) (Entry, error) {
@@ -160,6 +158,7 @@ func (manager *Manager) CreateSessionCookie(w http.ResponseWriter, user User) {
 		Path:     "/",
 		SameSite: http.SameSiteDefaultMode,
 		HttpOnly: true,
+		Secure:   manager.secure,
 	})
 }
 
@@ -181,7 +180,7 @@ func (manager *Manager) ReadSessionCookie(req *http.Request) (User, error) {
 		return User{}, err
 	}
 	if cookie.Expires.After(time.Now()) {
-		return User{}, errors.New("expired sesison cookie")
+		return User{}, errors.New("expired session cookie")
 	}
 	user, err := manager.GetUserIfValid(sessionId)
 	if err != nil {
@@ -197,9 +196,11 @@ func (manager *Manager) DestroySession(w http.ResponseWriter, req *http.Request)
 	}
 	manager.store.Delete(session)
 	http.SetCookie(w, &http.Cookie{
-		Name:  cookieKey,
-		Value: "",
-		Path:  "/",
+		Name:     cookieKey,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   manager.secure,
 	})
 	return nil
 }

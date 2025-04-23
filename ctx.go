@@ -59,6 +59,10 @@ func (ctx Ctx) Get(key any) any {
 	return ctx.ctx.Value(key)
 }
 
+func (ctx Ctx) Context() context.Context {
+	return ctx.ctx
+}
+
 func (ctx Ctx) Redirect(to string) error {
 	http.Redirect(ctx.Res, ctx.Req, to, http.StatusTemporaryRedirect)
 	return nil
