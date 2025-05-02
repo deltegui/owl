@@ -35,6 +35,8 @@ type SessionStore interface {
 	Save(entry Entry)
 	Get(id Id) (Entry, error)
 	Delete(id Id)
+	Invalidate(userId int64)
+	RecollectGarbage()
 }
 
 type MemoryStore struct {
@@ -52,21 +54,31 @@ func NewMemoryStore() *MemoryStore {
 func (store *MemoryStore) Save(entry Entry) {
 	store.mutex.Lock()
 	store.values[entry.Id] = entry
-	store.recollectGarbage()
 	store.mutex.Unlock()
 }
 
-func (store *MemoryStore) recollectGarbage() {
+func (store *MemoryStore) RecollectGarbage() {
+	store.mutex.Lock()
 	for key, entry := range store.values {
 		if !entry.IsValid() {
 			delete(store.values, key)
 		}
 	}
+	store.mutex.Unlock()
+}
+
+func (store *MemoryStore) Invalidate(userId int64) {
+	store.mutex.Lock()
+	for key, entry := range store.values {
+		if entry.User.Id == userId {
+			delete(store.values, key)
+		}
+	}
+	store.mutex.Unlock()
 }
 
 func (store *MemoryStore) Get(id Id) (Entry, error) {
 	store.mutex.Lock()
-	store.recollectGarbage()
 	entry, ok := store.values[id]
 	store.mutex.Unlock()
 
@@ -87,23 +99,26 @@ type Manager struct {
 	timeoutDuration time.Duration
 	cypher          core.Cypher
 	secure          bool
+	invalidate      bool
 }
 
-func NewManager(store SessionStore, duration time.Duration, cypher core.Cypher, secure bool) *Manager {
+func NewManager(store SessionStore, duration time.Duration, cypher core.Cypher, secure, invalidate bool) *Manager {
 	return &Manager{
 		store:           store,
 		timeoutDuration: duration,
 		cypher:          cypher,
 		secure:          secure,
+		invalidate:      invalidate,
 	}
 }
 
-func NewInMemoryManager(duration time.Duration, cypher core.Cypher, secure bool) *Manager {
+func NewInMemoryManager(duration time.Duration, cypher core.Cypher, secure, invalidate bool) *Manager {
 	return NewManager(
 		NewMemoryStore(),
 		duration,
 		cypher,
-		secure)
+		secure,
+		invalidate)
 }
 
 func (manager *Manager) Add(user User) Entry {
@@ -113,7 +128,9 @@ func (manager *Manager) Add(user User) Entry {
 		User:    user,
 		Timeout: time.Now().Add(manager.timeoutDuration),
 	}
+	manager.invalidateEntries(user.Id)
 	manager.store.Save(entry)
+	manager.store.RecollectGarbage()
 	return entry
 }
 
@@ -121,7 +138,14 @@ func (manager *Manager) createSessionId() Id {
 	return Id(core.GenerateTokenDefaultLength())
 }
 
+func (manager *Manager) invalidateEntries(userId int64) {
+	if manager.invalidate {
+		manager.store.Invalidate(userId)
+	}
+}
+
 func (manager *Manager) Get(id Id) (Entry, error) {
+	manager.store.RecollectGarbage()
 	return manager.store.Get(id)
 }
 
