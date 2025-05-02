@@ -112,6 +112,16 @@ func NewManager(store SessionStore, duration time.Duration, cypher core.Cypher, 
 	}
 }
 
+func NewManagerWithDefaults(store SessionStore, duration time.Duration, cypher core.Cypher) *Manager {
+	return &Manager{
+		store:           store,
+		timeoutDuration: duration,
+		cypher:          cypher,
+		secure:          true,
+		invalidate:      true,
+	}
+}
+
 func NewInMemoryManager(duration time.Duration, cypher core.Cypher, secure, invalidate bool) *Manager {
 	return NewManager(
 		NewMemoryStore(),
