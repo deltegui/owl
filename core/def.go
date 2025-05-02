@@ -20,7 +20,7 @@ const (
 const OneDayDuration time.Duration = 24 * time.Hour
 
 type Hasher interface {
-	Hash(value string) string
+	Hash(value string) (string, error)
 	Check(a, b string) bool
 }
 
