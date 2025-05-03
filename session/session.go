@@ -94,41 +94,53 @@ func (store *MemoryStore) Delete(id Id) {
 	store.mutex.Unlock()
 }
 
+type ManagerConfiguration struct {
+	// Secure controls cookie "secure" parameter.
+	// True means only use it with HTTPS, false use both
+	// HTTP and HTTPS.
+	Secure bool
+
+	// Invlidate enabled session renew feature. If is enabled
+	// invalidates old sessions every time user logins. If it
+	// is not enabled old sessions remains valid util expires.
+	Invalidate bool
+}
+
 type Manager struct {
 	store           SessionStore
 	timeoutDuration time.Duration
 	cypher          core.Cypher
-	secure          bool
-	invalidate      bool
+	configuration   ManagerConfiguration
 }
 
-func NewManager(store SessionStore, duration time.Duration, cypher core.Cypher, secure, invalidate bool) *Manager {
+func NewManager(store SessionStore, duration time.Duration, cypher core.Cypher, configuration ManagerConfiguration) *Manager {
 	return &Manager{
 		store:           store,
 		timeoutDuration: duration,
 		cypher:          cypher,
-		secure:          secure,
-		invalidate:      invalidate,
+		configuration:   configuration,
 	}
 }
 
 func NewManagerWithDefaults(store SessionStore, duration time.Duration, cypher core.Cypher) *Manager {
+	config := ManagerConfiguration{
+		Secure:     true,
+		Invalidate: true,
+	}
 	return &Manager{
 		store:           store,
 		timeoutDuration: duration,
 		cypher:          cypher,
-		secure:          true,
-		invalidate:      true,
+		configuration:   config,
 	}
 }
 
-func NewInMemoryManager(duration time.Duration, cypher core.Cypher, secure, invalidate bool) *Manager {
+func NewInMemoryManager(duration time.Duration, cypher core.Cypher, configuration ManagerConfiguration) *Manager {
 	return NewManager(
 		NewMemoryStore(),
 		duration,
 		cypher,
-		secure,
-		invalidate)
+		configuration)
 }
 
 func (manager *Manager) Add(user User) Entry {
@@ -149,7 +161,7 @@ func (manager *Manager) createSessionId() Id {
 }
 
 func (manager *Manager) invalidateEntries(userId int64) {
-	if manager.invalidate {
+	if manager.configuration.Invalidate {
 		manager.store.Invalidate(userId)
 	}
 }
@@ -192,7 +204,7 @@ func (manager *Manager) CreateSessionCookie(w http.ResponseWriter, user User) {
 		Path:     "/",
 		SameSite: http.SameSiteDefaultMode,
 		HttpOnly: true,
-		Secure:   manager.secure,
+		Secure:   manager.configuration.Secure,
 	})
 }
 
@@ -234,7 +246,7 @@ func (manager *Manager) DestroySession(w http.ResponseWriter, req *http.Request)
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   manager.secure,
+		Secure:   manager.configuration.Secure,
 	})
 	return nil
 }
