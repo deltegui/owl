@@ -72,7 +72,8 @@ func (csrf Csrf) Check(token string) bool {
 		return false
 	}
 	t := time.Unix(i, 0)
-	if t.After(time.Now().Add(-csrf.expires)) {
+	expirationTime := t.Add(-csrf.expires)
+	if expirationTime.Before(time.Now()) {
 		log.Println("Expired csrf token!")
 		return false
 	}
