@@ -158,7 +158,6 @@ func CreateCookie(w http.ResponseWriter, localization string, cy core.Cypher) er
 	if slices.Contains(suppoertedLangauges, localization) {
 		lang = localization
 	}
-	log.Printf("Creating language cookie for lang; '%s'", lang)
 	encode, err := cypher.EncodeCookie(cy, lang)
 	if err != nil {
 		return fmt.Errorf("cannot create language cookie: %w", err)

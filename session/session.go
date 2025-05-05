@@ -59,22 +59,22 @@ func (store *MemoryStore) Save(entry Entry) {
 
 func (store *MemoryStore) RecollectGarbage() {
 	store.mutex.Lock()
+	defer store.mutex.Unlock()
 	for key, entry := range store.values {
 		if !entry.IsValid() {
 			delete(store.values, key)
 		}
 	}
-	store.mutex.Unlock()
 }
 
 func (store *MemoryStore) Invalidate(userId int64) {
 	store.mutex.Lock()
+	defer store.mutex.Unlock()
 	for key, entry := range store.values {
 		if entry.User.Id == userId {
 			delete(store.values, key)
 		}
 	}
-	store.mutex.Unlock()
 }
 
 func (store *MemoryStore) Get(id Id) (Entry, error) {
