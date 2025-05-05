@@ -13,7 +13,7 @@ func GenerateToken(numberBytes int) string {
 	if _, err := rand.Read(b); err != nil {
 		log.Panicln("Error while generating random token: ", err)
 	}
-	return base64.RawStdEncoding.EncodeToString(b)
+	return base64.RawURLEncoding.EncodeToString(b)
 }
 
 func GenerateTokenDefaultLength() string {
