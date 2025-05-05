@@ -53,7 +53,7 @@ func Admin(manager *session.Manager, url string) owl.Middleware {
 				handleError(ctx, url)
 				return err
 			}
-			if slices.Contains(user.Roles, core.RoleAdmin) {
+			if !slices.Contains(user.Roles, core.RoleAdmin) {
 				log.Println("User is not admin!")
 				handleError(ctx, url)
 				return err
