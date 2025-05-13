@@ -13,10 +13,13 @@ import (
 	"github.com/deltegui/owl/core"
 )
 
+// AES256 is an implementation of the interface core.Cypher using
+// the AES256 symmetric algorithm.
 type AES256 struct {
 	cipher cipher.AEAD
 }
 
+// Generates a random password to use with AES256.
 func GenerateRandomPass() ([]byte, error) {
 	bytes := make([]byte, core.Size32) // generate a random 32 byte key for AES-256
 	if _, err := rand.Read(bytes); err != nil {
@@ -25,6 +28,7 @@ func GenerateRandomPass() ([]byte, error) {
 	return bytes, nil
 }
 
+// Generates a random password as string to use with AES256.
 func GenerateRandomPassAsString() (string, error) {
 	bytes, err := GenerateRandomPass()
 	if err != nil {
@@ -35,35 +39,41 @@ func GenerateRandomPassAsString() (string, error) {
 
 func generateCipher(pass []byte) cipher.AEAD {
 	if len(pass) != core.Size32 {
-		log.Fatalln("The csrf encrypt password must be 32 bit long")
+		log.Panicln("The AES256 encrypt password must be 32 bit long")
 	}
 	aes, err := aes.NewCipher(pass)
 	if err != nil {
-		log.Fatalln("Cannot create cipher for CSRF", err)
+		log.Panicln("Cannot create cipher for AES256", err)
 	}
 	gcm, err := cipher.NewGCM(aes)
 	if err != nil {
-		log.Fatalln("Cannot create CGM:", err)
+		log.Panicln("Cannot create CGM:", err)
 	}
 	return gcm
 }
 
+// Creates a Cypher with a random password. Everytime you create a cypher
+// will generate a new random password. Keep in mind that anything encrypted
+// with other instances will not be decrypted because they dont share passwords.
+// Will panic if it cannot generate a random password.
 func New() core.Cypher {
 	bytes, err := GenerateRandomPass()
 	if err != nil {
-		log.Fatalln("Cannot create cypher: ", err)
+		log.Panicln("Cannot create cypher: ", err)
 	}
 	return AES256{
 		cipher: generateCipher(bytes),
 	}
 }
 
+// Creates a Cypher with a provided password as bytes
 func NewWithPassword(password []byte) core.Cypher {
 	return AES256{
 		cipher: generateCipher(password),
 	}
 }
 
+// Creates a Cypher with a provided password as string
 func NewWithPasswordAsString(password string) core.Cypher {
 	bytes, err := base64.RawStdEncoding.DecodeString(password)
 	if err != nil {
@@ -72,44 +82,26 @@ func NewWithPasswordAsString(password string) core.Cypher {
 	return NewWithPassword(bytes)
 }
 
+// Encrypt bytes using AES256. Will return an error if cannot encrypt.
 func (aes AES256) Encrypt(data []byte) ([]byte, error) {
 	nonce := make([]byte, aes.cipher.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, fmt.Errorf("cannot read from rand: %w", err)
+		return nil, fmt.Errorf("cannot encrypt using AES256: %w", err)
 	}
 	dst := aes.cipher.Seal(nonce, nonce, data, nil)
 	return dst, nil
 }
 
+// Decrypt bytes using AES256. Will return an error if cannot decrypt information.
 func (aes AES256) Decrypt(data []byte) ([]byte, error) {
 	nonceSize := aes.cipher.NonceSize()
 	if len(data) < nonceSize {
-		return nil, errors.New("malformed csrf token")
+		return nil, errors.New("malformed AES256 encryted data")
 	}
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 	plaintext, err := aes.cipher.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return nil, fmt.Errorf("cannot decrypt csrf token: %w", err)
+		return nil, fmt.Errorf("cannot decrypt AES256: %w", err)
 	}
 	return plaintext, nil
-}
-
-func EncodeCookie(cypher core.Cypher, data string) (string, error) {
-	bytes, err := cypher.Encrypt([]byte(data))
-	if err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(bytes), nil
-}
-
-func DecodeCookie(cypher core.Cypher, data string) (string, error) {
-	bytes, err := base64.RawURLEncoding.DecodeString(data)
-	if err != nil {
-		return "", err
-	}
-	plaintext, err := cypher.Decrypt(bytes)
-	if err != nil {
-		return "", err
-	}
-	return string(plaintext), nil
 }

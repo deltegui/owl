@@ -10,15 +10,25 @@ import (
 	"time"
 )
 
+// Defines a file store. A file store gives an API to
+// store files, abstracting the client from the real path and
+// returning an URL to access the file.
 type Store struct {
 	url  string
 	path string
 }
 
+// Creates a Store with a base url and a base path. For example,
+// lets say we create a store with url http://localhost:8080/static and a base
+// path of /home/user/static. We want to store the file /a/file.txt will be
+// stored phiscally in /home/user/static/a/file.txt. The returned URL will
+// be http://localhost:8080/static/a/file.txt.
 func NewStore(url, path string) Store {
 	return Store{url, path}
 }
 
+// Saves a byte buffer in a file located in a relative path. Returns a string with
+// a URL to access the file. Can return an error if the file cannot be saved.
 func (s Store) Save(buffer []byte, relativePath string) (string, error) {
 	file, fullPath, err := s.createFile(relativePath)
 	if err != nil {
@@ -41,6 +51,10 @@ func (s Store) generateURL(relativePath string) string {
 	return fmt.Sprintf("%s/%s", s.url, relativePath)
 }
 
+// Copies a file in this store to other relative path in other store. For example,
+// if you call a.Copy("/a/src.txt", "/b/target.txt", b) you are telling "Copy from
+// file store 'a' the file stored in the relative path /a/src.txt to store 'b'
+// in relative path /b/target.txt"
 func (s Store) Copy(searchPath, targetPath string, other Store) (string, error) {
 	outFile, err := s.openFile(searchPath)
 	if err != nil {
@@ -60,6 +74,7 @@ func (s Store) Copy(searchPath, targetPath string, other Store) (string, error) 
 	return other.generateURL(targetPath), nil
 }
 
+// Check if a file exists in the store
 func (s Store) Exists(relativePath string) bool {
 	_, err := s.openFile(relativePath)
 	return err == nil
@@ -93,6 +108,8 @@ func (s Store) createFile(relativePath string) (*os.File, string, error) {
 	return file, fullPath, nil
 }
 
+// DeleteOld files in the store. Files will be deleted if its modification
+// time is older than the parameter 'duration'.
 func (s Store) DeleteOld(duration time.Duration) error {
 	files, err := os.ReadDir(s.path)
 	if err != nil {
@@ -115,10 +132,12 @@ func (s Store) DeleteOld(duration time.Duration) error {
 	return nil
 }
 
+// Opens a file using its relative path
 func (s Store) Open(path string) (io.ReadWriteCloser, string, error) {
 	return s.createFile(path)
 }
 
+// Delete a file using its relative path
 func (s Store) Delete(relativePath string) error {
 	fullPath := fmt.Sprintf("%s/%s", s.path, relativePath)
 	return os.Remove(fullPath)

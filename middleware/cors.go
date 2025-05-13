@@ -29,6 +29,7 @@ type CorsOptions struct {
 	MaxAge       int
 }
 
+// Cors default middleware with default options. See Cors middleware.
 func CorsDefault() owl.Middleware {
 	return Cors(corsDefaultOptions)
 }
@@ -77,6 +78,7 @@ func getHeadersNames(ctx owl.Ctx) []string {
 	return flatten
 }
 
+// Cors middleware using CorsOptions.
 func Cors(opt CorsOptions) owl.Middleware {
 	return func(next owl.Handler) owl.Handler {
 		return func(ctx owl.Ctx) error {

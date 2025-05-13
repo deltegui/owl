@@ -4,7 +4,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// BcryptHasher is an implementation of a users Hasher that use Bcrypt.
+// BcryptHasher is an implementation of a core.Hasher that use Bcrypt.
 type BcryptHasher struct {
 	Cost int
 }

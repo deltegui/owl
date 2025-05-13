@@ -12,6 +12,7 @@ import (
 	"github.com/deltegui/valtruc"
 )
 
+// Muxi is a Multiplexer with a dependency injection container.
 type Muxi struct {
 	router   *httprouter.Router
 	cypher   core.Cypher

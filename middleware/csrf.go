@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/deltegui/owl"
@@ -15,9 +15,9 @@ func Csrf(cs *csrf.Csrf) owl.Middleware {
 				ctx.Set(csrf.ContextKey, cs.Generate())
 				return next(ctx)
 			}
-			if !cs.CheckRequest(ctx.Req) {
+			if err := cs.CheckRequest(ctx.Req); err != nil {
 				ctx.Res.WriteHeader(http.StatusForbidden)
-				return errors.New("expired csrf token")
+				return fmt.Errorf("invalid csrf: %w", err)
 			}
 			ctx.Set(csrf.ContextKey, cs.Generate())
 			return next(ctx)
