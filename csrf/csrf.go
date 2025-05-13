@@ -16,7 +16,7 @@ import (
 // CSRF token in a HTTP request.
 const CsrfHeaderName string = "X-Csrf-Token"
 
-// Csrf gives an API to create and check Csrf tokens.
+// Csrf gives an API to create and check Csrf tokens to avoid Csrf attacks.
 type Csrf struct {
 	cipher  core.Cypher
 	expires time.Duration

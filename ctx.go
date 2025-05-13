@@ -17,6 +17,14 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
+// Ctx represents the request Context. This includes:
+// - http.Request
+// - http.ResponseWriter
+// - URL params
+// - request context.Context
+// - ModelState validation
+//
+// This is the main API to interact with a request.
 type Ctx struct {
 	Req    *http.Request
 	Res    http.ResponseWriter
@@ -29,6 +37,8 @@ type Ctx struct {
 	cypher     core.Cypher
 }
 
+// Validates a struct. Will populate ModelState telling if
+// struct is valid and the errors found.
 func (ctx *Ctx) Validate(target any) {
 	errs := ctx.validator.Validate(target)
 	state := core.ModelState{
@@ -51,36 +61,64 @@ func (ctx *Ctx) Validate(target any) {
 	ctx.ModelState = state
 }
 
+// Set a variable in the context.Context.
 func (ctx *Ctx) Set(key, value any) {
 	ctx.ctx = context.WithValue(ctx.ctx, key, value)
 }
 
+// Get a value identified by key in context.Context.
 func (ctx Ctx) Get(key any) any {
 	return ctx.ctx.Value(key)
 }
 
+// Return current request context.Context
 func (ctx Ctx) Context() context.Context {
 	return ctx.ctx
 }
 
+// Redirects to other URL with HTTP code 307 (temporary redirect).
 func (ctx Ctx) Redirect(to string) error {
 	http.Redirect(ctx.Res, ctx.Req, to, http.StatusTemporaryRedirect)
 	return nil
 }
 
+// Redirect to other URL with the provided status code.
 func (ctx Ctx) RedirectCode(to string, code int) error {
 	http.Redirect(ctx.Res, ctx.Req, to, code)
 	return nil
 }
 
+// Get URL param. You can define an URL param adding a colon in front of
+// it:
+//
+// /index/:param
+//
+// Then just read it:
+//
+// param := ctx.GetURLParam("param")
+//
+// This function will always return something. If no url param is found
+// will return empty string.
 func (ctx Ctx) GetURLParam(name string) string {
 	return ctx.params.ByName(name)
 }
 
+// Get query URL param. For example:
+//
+// /index?first=hello&second=hola
+//
+// Then, you can access to URL params this way:
+//
+//	a := ctx.GetQueryParam("first") // returns hello
+//	b := ctx.GetQueryParam("second") // returns hola
 func (ctx Ctx) GetQueryParam(name string) string {
 	return ctx.Req.URL.Query().Get(name)
 }
 
+// Json writes to http respond a Json with the data in the struct 'data'. You
+// should pass an http status. Example:
+//
+//	ctx.Json(http.StatusOk, struct{Name string}{"Manolito"}) // returns the Json '{ A: "Manolito" }'
 func (ctx Ctx) Json(status int, data any) error {
 	response, err := json.Marshal(data)
 	if err != nil {
@@ -92,49 +130,111 @@ func (ctx Ctx) Json(status int, data any) error {
 	return err
 }
 
+// Json writes to http respond a Json with the data in the struct 'data' with a HTTP Ok status (200)
 func (ctx Ctx) JsonOk(data any) error {
 	return ctx.Json(http.StatusOK, data)
 }
 
+// String just writes a string with a status to http response. Supports string format. Example:
+//
+//	ctx.String(http.StatusOk, "Hello %s for %d time", "Manolito", 3)
 func (ctx Ctx) String(status int, data string, a ...any) error {
 	ctx.Res.WriteHeader(status)
 	fmt.Fprintf(ctx.Res, data, a...)
 	return nil
 }
 
+// BadRequest just writes a string with a bad request (400) http status to http response. See String method.
 func (ctx Ctx) BadRequest(data string, a ...any) error {
 	return ctx.String(http.StatusBadRequest, data, a...)
 }
 
+// NotFound just writes a string with a not found (404) http status to http response. See String method.
 func (ctx Ctx) NotFound(data string, a ...any) error {
 	return ctx.String(http.StatusNotFound, data, a...)
 }
 
+// Ok just writes a string with a ok (200) http status to http response. See String method.
 func (ctx Ctx) Ok(data string, a ...any) error {
 	return ctx.String(http.StatusOK, data, a...)
 }
 
+// InternalServerError just writes a string with a internal server error (500) http status to http response. See String method.
 func (ctx Ctx) InternalServerError(data string, a ...any) error {
 	return ctx.String(http.StatusInternalServerError, data, a...)
 }
 
+// NoContent just writes no content (204) status.
 func (ctx Ctx) NotContent() error {
 	ctx.Res.WriteHeader(http.StatusNoContent)
 	return nil
 }
 
+// Forbidden just writes a string with a forbidden (403) http status to http response. See String method.
 func (ctx Ctx) Forbidden(data string, a ...any) error {
 	return ctx.String(http.StatusForbidden, data, a...)
 }
 
+// ParseJson reads http request body, decode it as a Json and stores it in the struct pointed by dst.
 func (ctx Ctx) ParseJson(dst any) error {
 	return json.NewDecoder(ctx.Req.Body).Decode(dst)
 }
 
+// Render writes to http response a rendered template. You must pass the following arguments:
+//
+// - templ: Templates parsed needed to render the view.
+// - name: Name of the view you want to render and is parsed in templ
+// - m: A model you pass to the view.
+//
+// Example of use:
+//
+//	func indexHandler(service demoService) owl.Handler {
+//		templ := views.Parse("DemoLayout.html", "DemoMainView.html")
+//		return func(ctx owl.Ctx) error {
+//			return ctx.Render(templ, "DemoMainView", viewModel{
+//				Name: "Manolito",
+//			})
+//		}
+//	}
+//
+// If you define a DemoLayout.html like this:
+//
+//	<html>
+//	<head>
+//		<title>¡Hello!</title>
+//	</head>
+//	<body>
+//		{{ block "Content" }}
+//			<!-- Content -->
+//		{{ end }}
+//	</body>
+//
+// </html>
+//
+// And you fill other file named DemoMainView.html this way:
+//
+//	{{ define "Content" }}
+//		<h1>Hello {{ .Model.Name }}</h1>
+//	{{ end }}
+//
+// The above code will render this html:
+//
+//	<html>
+//	<head>
+//		<title>¡Hello!</title>
+//	</head>
+//	<body>
+//		<h1>Hello Manolito</h1>
+//	</body>
+//	</html>
+//
+// For more information how ViewModels works see ViewModel struct type.
 func (ctx Ctx) Render(templ *template.Template, name string, m any) error {
 	return templ.Execute(ctx.Res, createViewModel(ctx, name, m))
 }
 
+// GetLocalizer creates a Localizer from Json file with the language defined
+// in http cookie.
 func (ctx Ctx) GetLocalizer(file string) localizer.Localizer {
 	if ctx.locstore == nil {
 		return localizer.Localizer{}
@@ -142,6 +242,8 @@ func (ctx Ctx) GetLocalizer(file string) localizer.Localizer {
 	return ctx.locstore.GetUsingRequest(file, ctx.Req)
 }
 
+// Localizes a key using the Json file you provided with the language defined
+// in http cookie.
 func (ctx Ctx) Localize(file, key string) string {
 	if ctx.locstore == nil {
 		return key
@@ -149,6 +251,8 @@ func (ctx Ctx) Localize(file, key string) string {
 	return ctx.locstore.GetUsingRequest(file, ctx.Req).Get(key)
 }
 
+// Localizes a key using the Json file you provided with the language defined
+// in http cookie. Ignores Shared translations.
 func (ctx Ctx) LocalizeWithoutShared(file, key string) string {
 	if ctx.locstore == nil {
 		return key
@@ -156,6 +260,8 @@ func (ctx Ctx) LocalizeWithoutShared(file, key string) string {
 	return ctx.locstore.GetUsingRequestWithoutShared(file, ctx.Req).Get(key)
 }
 
+// Localizes a DomainError using the error Json file with the language defined
+// in http cookie.
 func (ctx Ctx) LocalizeError(err core.DomainError) string {
 	if ctx.locstore == nil {
 		return err.Message
@@ -163,6 +269,7 @@ func (ctx Ctx) LocalizeError(err core.DomainError) string {
 	return ctx.locstore.GetLocalizedError(err, ctx.Req)
 }
 
+// HaveSession tells if a session is created for this http request.
 func (ctx Ctx) HaveSession() bool {
 	instance := ctx.Get(session.ContextKey)
 	if instance == nil {
@@ -174,14 +281,17 @@ func (ctx Ctx) HaveSession() bool {
 	return true
 }
 
+// GetUser get current logged user.
 func (ctx Ctx) GetUser() session.User {
 	return ctx.Get(session.ContextKey).(session.User)
 }
 
+// GetCurrentLanguage get current cookie defined language.
 func (ctx *Ctx) GetCurrentLanguage() string {
 	return ctx.locstore.ReadCookie(ctx.Req)
 }
 
+// ChangeLanguage changes current cookie defined language.
 func (ctx *Ctx) ChangeLanguage(to string) error {
 	return ctx.locstore.CreateCookie(ctx.Res, to)
 }
@@ -201,6 +311,7 @@ type CookieOptions struct {
 	Secure bool
 }
 
+// Creates a cookie with provided options.
 func (ctx *Ctx) CreateCookieOptions(opt CookieOptions) error {
 	var data string
 	var err error
@@ -222,6 +333,8 @@ func (ctx *Ctx) CreateCookieOptions(opt CookieOptions) error {
 	return nil
 }
 
+// Creates a cookie with name and data. By default uses a one day duration expiration,
+// HttpOnly enabled, and Secure enabled.
 func (ctx *Ctx) CreateCookie(name, data string) error {
 	return ctx.CreateCookieOptions(CookieOptions{
 		Name:     name,
@@ -232,6 +345,7 @@ func (ctx *Ctx) CreateCookie(name, data string) error {
 	})
 }
 
+// Reads a cookie identified by name.
 func (ctx *Ctx) ReadCookie(name string) (string, error) {
 	cookie, err := ctx.Req.Cookie(name)
 	if err != nil {
@@ -245,6 +359,7 @@ func (ctx *Ctx) ReadCookie(name string) (string, error) {
 	return data, nil
 }
 
+// Deletes a cookie identified by name.
 func (ctx *Ctx) DeleteCookie(name string) error {
 	_, err := ctx.Req.Cookie(name)
 	if err != nil {
