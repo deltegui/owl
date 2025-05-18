@@ -19,6 +19,8 @@ type ViewModel struct {
 	Show               bool
 	ShowPreviousButton bool
 	ShowNextButton     bool
+	Order              int    `html:"pagination.order" json:"order"`
+	OrderBy            string `html:"pagination.orderBy" json:"orderBy"`
 	loc                localizer.Localizer
 }
 
@@ -42,6 +44,8 @@ func (vm ViewModel) ToDto() Pagination {
 	return Pagination{
 		CurrentPage: vm.CurrentPage,
 		Enabeld:     true,
+		Order:       Order(vm.Order),
+		OrderBy:     vm.OrderBy,
 	}
 }
 
@@ -72,6 +76,8 @@ func ToVM(ctx owl.Ctx, p Pagination) ViewModel {
 		PreviousPage:       p.CurrentPage - 1,
 		CurrentPage:        p.CurrentPage,
 		NextPage:           p.CurrentPage + 1,
+		Order:              int(p.Order),
+		OrderBy:            p.OrderBy,
 		loc:                ctx.GetLocalizer("common/pagination"),
 	}
 }

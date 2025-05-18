@@ -37,8 +37,8 @@ func (vm ViewModel) PlaceCsrfInput() template.HTML {
 	return template.HTML(`<input type="hidden" name="` + csrf.CsrfHeaderName + `" value="` + vm.CsrfToken + `"/>`)
 }
 
-func (vm ViewModel) Localize(key string) string {
-	return vm.Localizer.Get(key)
+func (vm ViewModel) Localize(key string, args ...any) string {
+	return vm.Localizer.GetFormatted(key, args...)
 }
 
 func (vm ViewModel) LocalizeError(err core.DomainError) string {

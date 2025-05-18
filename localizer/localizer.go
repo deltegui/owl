@@ -18,7 +18,7 @@ import (
 // Localizer is a map of key and translations.
 type Localizer map[string]string
 
-// Safelly gets a localizer key. If the key is not
+// Safely gets a localizer key. If the key is not
 // defined in the localizer returns the key instead
 // of returning the translation.
 func (loc Localizer) Get(key string) string {
@@ -27,6 +27,15 @@ func (loc Localizer) Get(key string) string {
 		return key
 	}
 	return val
+}
+
+// Safely gets a localizer key. If the key is not
+// defined in the localizer returns the key instead
+// of returning the translation. Then, it will format
+// the string replacing a format specifier (using fmt.Sprintf)
+func (loc Localizer) GetFormatted(key string, args ...any) string {
+	localized := loc.Get(key)
+	return fmt.Sprintf(localized, args...)
 }
 
 // i18n is a map of languages and Localizer.
