@@ -135,3 +135,11 @@ func (injector Injector) Run(runner Runner) {
 	runnerVal := reflect.ValueOf(runner)
 	runnerVal.Call(inputs)
 }
+
+func (injector Injector) clone() *Injector {
+	builders := make(map[reflect.Type]Builder)
+	for k, v := range injector.builders {
+		builders[k] = v
+	}
+	return &Injector{builders}
+}

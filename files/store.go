@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -111,25 +114,21 @@ func (s Store) createFile(relativePath string) (*os.File, string, error) {
 // DeleteOld files in the store. Files will be deleted if its modification
 // time is older than the parameter 'duration'.
 func (s Store) DeleteOld(duration time.Duration) error {
-	files, err := os.ReadDir(s.path)
-	if err != nil {
-		return err
-	}
-
-	for _, file := range files {
+	return filepath.WalkDir(s.path, func(path string, file fs.DirEntry, err error) error {
+		log.Println(path)
 		if file.Type().IsRegular() {
 			info, err := file.Info()
 			if err != nil {
 				return err
 			}
 			if time.Since(info.ModTime()) > duration {
-				if err := os.Remove(file.Name()); err != nil {
+				if err := os.Remove(path); err != nil {
 					return err
 				}
 			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 // Opens a file using its relative path

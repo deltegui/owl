@@ -1,9 +1,7 @@
 package owl
 
 import (
-	"fmt"
 	"html/template"
-	"log"
 
 	"github.com/deltegui/owl/core"
 	"github.com/deltegui/owl/csrf"
@@ -68,13 +66,10 @@ func (vm ViewModel) GetFormError(key string) string {
 }
 
 func (vm ViewModel) formatError(key string, err core.ValidationError) string {
-	log.Println("Error:", err)
-	locVal := vm.Localize(string(err.GetIdentifier()))
-	log.Println("locVal format error", locVal)
-	finalVal := err.Format(locVal)
-	log.Println(finalVal)
 	locKey := vm.Localize(key)
-	return fmt.Sprintf(finalVal, locKey)
+	locVal := vm.Localize(string(err.GetIdentifier()), locKey)
+	finalVal := err.Format(locVal)
+	return finalVal
 }
 
 func (vm ViewModel) GetAllFormErrors(key string) []string {

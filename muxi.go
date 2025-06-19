@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/julienschmidt/httprouter"
 
@@ -12,11 +13,32 @@ import (
 	"github.com/deltegui/valtruc"
 )
 
+type SubMuxi interface {
+	Handle(method, pattern string, builder Builder, middlewares ...Middleware)
+	Get(pattern string, builder Builder, middlewares ...Middleware)
+	Post(pattern string, builder Builder, middlewares ...Middleware)
+	Patch(pattern string, builder Builder, middlewares ...Middleware)
+	Delete(pattern string, builder Builder, middlewares ...Middleware)
+	Head(pattern string, builder Builder, middlewares ...Middleware)
+	Options(pattern string, builder Builder, middlewares ...Middleware)
+	Put(pattern string, builder Builder, middlewares ...Middleware)
+	Trace(pattern string, builder Builder, middlewares ...Middleware)
+
+	Use(middleware Middleware)
+
+	Run(runner Runner)
+	ShowAvailableBuilders()
+	PopulateStruct(s any)
+	Add(builder Builder)
+}
+
 // Muxi is a HTTP multiplexer (router) with a dependency injection container.
 type Muxi struct {
 	router   *httprouter.Router
 	cypher   core.Cypher
 	locStore *localizer.WebStore
+
+	routePrefix string
 
 	injector *Injector
 
@@ -43,6 +65,17 @@ func (mux *Muxi) createContext(w http.ResponseWriter, req *http.Request, params 
 		locstore:  mux.locStore,
 		validator: valtruc.New(),
 		cypher:    mux.cypher,
+	}
+}
+
+func (mux *Muxi) CreateSubMuxi(prefix string) SubMuxi {
+	return &Muxi{
+		router:      mux.router,
+		locStore:    mux.locStore,
+		cypher:      mux.cypher,
+		middlewares: slices.Clone(mux.middlewares),
+		routePrefix: normalizePath(prefix),
+		injector:    mux.injector.clone(),
 	}
 }
 
@@ -96,7 +129,7 @@ func (mux *Muxi) Handle(method, pattern string, builder Builder, middlewares ...
 	for _, m := range mux.middlewares {
 		handler = m(handler)
 	}
-	mux.router.Handle(method, pattern, func(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	mux.router.Handle(method, normalizePath(mux.routePrefix+pattern), func(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
 		ctx := mux.createContext(w, req, params)
 		handler(ctx)
 	})

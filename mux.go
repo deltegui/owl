@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
+	"strings"
 	"syscall"
 	"time"
 
@@ -17,6 +19,36 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 )
+
+// SubMux represents a subrouter within the Owl framework.
+//
+// A SubMux is a limited, controlled view of a Mux (the main router).
+// Internally, a SubMux is simply a *Mux with its own route prefix and middlewares,
+// but its public interface restricts access to only the operations needed for a subrouter.
+//
+// In practice, CreateSubMux returns a SubMux which is a *Mux with the
+// accumulated routePrefix and a copy of middlewares.
+//
+// Example usage:
+//
+//	api := mux.CreateSubMux("/api")
+//	v1 := api.CreateSubMux("/v1")
+//	v1.Get("/ping", handler)
+//
+// Here, v1 is a SubMux that only allows registering routes and middlewares,
+// but does not expose global Mux methods such as starting the server.
+type SubMux interface {
+	Handle(method, pattern string, handler Handler, middlewares ...Middleware)
+	Get(pattern string, handler Handler, middlewares ...Middleware)
+	Post(pattern string, handler Handler, middlewares ...Middleware)
+	Patch(pattern string, handler Handler, middlewares ...Middleware)
+	Delete(pattern string, handler Handler, middlewares ...Middleware)
+	Head(pattern string, handler Handler, middlewares ...Middleware)
+	Options(pattern string, handler Handler, middlewares ...Middleware)
+	Put(pattern string, handler Handler, middlewares ...Middleware)
+	Trace(pattern string, handler Handler, middlewares ...Middleware)
+	Use(middleware Middleware)
+}
 
 // Handler is a function that handles HTTP requests. Example:
 //
@@ -52,6 +84,8 @@ type Mux struct {
 	locStore *localizer.WebStore
 
 	middlewares []Middleware
+
+	routePrefix string
 }
 
 // Creates a new multiplexer. Needs a core.Cypher
@@ -76,6 +110,16 @@ func (mux *Mux) createContext(w http.ResponseWriter, req *http.Request, params h
 	}
 }
 
+func (mux *Mux) CreateSubMux(prefix string) SubMux {
+	return &Mux{
+		router:      mux.router,
+		locStore:    mux.locStore,
+		cypher:      mux.cypher,
+		middlewares: slices.Clone(mux.middlewares),
+		routePrefix: normalizePath(mux.routePrefix + prefix),
+	}
+}
+
 // Handle registers a http Handle to a particular HTTP method and pattern.
 // A list of Middlewares can be optionally added. For example, register a handle this way:
 //
@@ -91,10 +135,32 @@ func (mux *Mux) Handle(method, pattern string, handler Handler, middlewares ...M
 	for _, m := range mux.middlewares {
 		handler = m(handler)
 	}
-	mux.router.Handle(method, pattern, func(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
+
+	mux.router.Handle(method, normalizePath(mux.routePrefix+pattern), func(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
 		ctx := mux.createContext(w, req, params)
 		handler(ctx)
 	})
+}
+
+func normalizePath(path string) string {
+	if path == "" {
+		return "/"
+	}
+
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+
+	path = strings.ReplaceAll(path, "//", "/")
+	for strings.Contains(path, "//") {
+		path = strings.ReplaceAll(path, "//", "/")
+	}
+
+	if len(path) > 1 && strings.HasSuffix(path, "/") {
+		path = strings.TrimSuffix(path, "/")
+	}
+
+	return path
 }
 
 // Get registers a handler to a particular pattern and HTTP Get method. See Handle method.
@@ -139,12 +205,21 @@ func (mux *Mux) Trace(pattern string, handler Handler, middlewares ...Middleware
 
 // Creates a static file server in the requested dir path.
 func (mux *Mux) Static(path string) {
-	mux.router.NotFound = http.FileServer(http.Dir(path))
+	//mux.router.NotFound = http.FileServer(http.Dir(path))
+	mux.router.NotFound = mux.createNotFoundHandler(http.Dir(path))
 }
 
 // Creates a static file server with the requested embedded file system.
 func (mux *Mux) StaticEmbedded(fs embed.FS) {
-	mux.router.NotFound = http.FileServer(http.FS(fs))
+	// mux.router.NotFound = http.FileServer(http.FS(fs))
+	mux.router.NotFound = mux.createNotFoundHandler(http.FS(fs))
+}
+
+func (mux *Mux) createNotFoundHandler(root http.FileSystem) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		http.FileServer(root).ServeHTTP(w, r)
+	})
 }
 
 // Creates a static file server in the requested dir URL and path.

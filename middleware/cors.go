@@ -83,10 +83,10 @@ func Cors(opt CorsOptions) owl.Middleware {
 	return func(next owl.Handler) owl.Handler {
 		return func(ctx owl.Ctx) error {
 			if ctx.Req.Method == http.MethodOptions {
-				ctx.Res.Header().Add("Access-Control-Allow-Origin", opt.AllowOrigin)
-				ctx.Res.Header().Add("Access-Control-Allow-Methods", strings.Join(opt.AllowMethods, ", "))
-				ctx.Res.Header().Add("Access-Control-Max-Age", strconv.Itoa(opt.MaxAge))
-				ctx.Res.Header().Add("Access-Control-Allow-Credentials", "true")
+				ctx.Res.Header().Set("Access-Control-Allow-Origin", opt.AllowOrigin)
+				ctx.Res.Header().Set("Access-Control-Allow-Methods", strings.Join(opt.AllowMethods, ", "))
+				ctx.Res.Header().Set("Access-Control-Max-Age", strconv.Itoa(opt.MaxAge))
+				ctx.Res.Header().Set("Access-Control-Allow-Credentials", "true")
 
 				reqMethod := ctx.Req.Header.Get("Access-Control-Request-Method")
 				if len(reqMethod) > 0 && !opt.isMethodAllowed(reqMethod) {
@@ -110,8 +110,11 @@ func Cors(opt CorsOptions) owl.Middleware {
 			if !opt.isAllHeadersAllowed(getHeadersNames(ctx)) {
 				return ctx.Forbidden("Request headers not allowed")
 			}
+
 			err := next(ctx)
-			ctx.Res.Header().Add("Access-Control-Allow-Origin", opt.AllowOrigin)
+
+			ctx.Res.Header().Set("Access-Control-Allow-Origin", opt.AllowOrigin)
+			ctx.Res.Header().Set("Access-Control-Allow-Credentials", "true")
 			return err
 		}
 	}
