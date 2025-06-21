@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -115,7 +114,6 @@ func (s Store) createFile(relativePath string) (*os.File, string, error) {
 // time is older than the parameter 'duration'.
 func (s Store) DeleteOld(duration time.Duration) error {
 	return filepath.WalkDir(s.path, func(path string, file fs.DirEntry, err error) error {
-		log.Println(path)
 		if file.Type().IsRegular() {
 			info, err := file.Info()
 			if err != nil {
