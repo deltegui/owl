@@ -90,25 +90,25 @@ func Cors(opt CorsOptions) owl.Middleware {
 
 				reqMethod := ctx.Req.Header.Get("Access-Control-Request-Method")
 				if len(reqMethod) > 0 && !opt.isMethodAllowed(reqMethod) {
-					return ctx.Forbidden("Method not allowed by CORS preflight: %s", reqMethod)
+					return ctx.StringForbidden("Method not allowed by CORS preflight: %s", reqMethod)
 				}
 
 				reqHeaders := ctx.Req.Header.Get("Access-Control-Request-Headers")
 				if len(reqHeaders) > 0 && !opt.isAllHeadersAllowed(strings.Split(reqHeaders, ", ")) {
-					return ctx.Forbidden("Request headers not allowed")
+					return ctx.StringForbidden("Request headers not allowed")
 				}
 
 				return ctx.NotContent()
 			}
 			if !opt.isMethodAllowed(ctx.Req.Method) {
-				return ctx.Forbidden("Method not allowed by CORS: %s", ctx.Req.Method)
+				return ctx.StringForbidden("Method not allowed by CORS: %s", ctx.Req.Method)
 			}
 			origin := ctx.Req.Header.Get("Origin")
 			if len(origin) != 0 && !opt.isOriginAllowed(origin) {
-				return ctx.Forbidden("Origin not allowed by CORS")
+				return ctx.StringForbidden("Origin not allowed by CORS")
 			}
 			if !opt.isAllHeadersAllowed(getHeadersNames(ctx)) {
-				return ctx.Forbidden("Request headers not allowed")
+				return ctx.StringForbidden("Request headers not allowed")
 			}
 
 			err := next(ctx)

@@ -115,16 +115,24 @@ func (ctx Ctx) GetQueryParam(name string) string {
 	return ctx.Req.URL.Query().Get(name)
 }
 
+// Status set the response status. Example:
+//
+// ctx.Status(http.StatusOk)
+//
+// Is an alias of ctx.Res.WriteHeader(status)
+func (ctx Ctx) Status(status int) {
+	ctx.Res.WriteHeader(status)
+}
+
 // Json writes to http respond a Json with the data in the struct 'data'. You
 // should pass an http status. Example:
 //
 //	ctx.Json(http.StatusOk, struct{Name string}{"Manolito"}) // returns the Json '{ A: "Manolito" }'
-func (ctx Ctx) Json(status int, data any) error {
+func (ctx Ctx) Json(data any) error {
 	response, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("error marshaling data: %w", err)
 	}
-	ctx.Res.WriteHeader(status)
 	ctx.Res.Header().Set("Content-Type", "application/json")
 	_, err = ctx.Res.Write(response)
 	return err
@@ -132,36 +140,64 @@ func (ctx Ctx) Json(status int, data any) error {
 
 // Json writes to http respond a Json with the data in the struct 'data' with a HTTP Ok status (200)
 func (ctx Ctx) JsonOk(data any) error {
-	return ctx.Json(http.StatusOK, data)
+	ctx.Status(http.StatusOK)
+	return ctx.Json(data)
 }
 
 // String just writes a string with a status to http response. Supports string format. Example:
 //
-//	ctx.String(http.StatusOk, "Hello %s for %d time", "Manolito", 3)
-func (ctx Ctx) String(status int, data string, a ...any) error {
-	ctx.Res.WriteHeader(status)
+//	ctx.String("Hello %s for %d time", "Manolito", 3)
+func (ctx Ctx) String(data string, a ...any) error {
 	fmt.Fprintf(ctx.Res, data, a...)
 	return nil
 }
 
-// BadRequest just writes a string with a bad request (400) http status to http response. See String method.
-func (ctx Ctx) BadRequest(data string, a ...any) error {
-	return ctx.String(http.StatusBadRequest, data, a...)
-}
-
-// NotFound just writes a string with a not found (404) http status to http response. See String method.
-func (ctx Ctx) NotFound(data string, a ...any) error {
-	return ctx.String(http.StatusNotFound, data, a...)
-}
-
 // Ok just writes a string with a ok (200) http status to http response. See String method.
-func (ctx Ctx) Ok(data string, a ...any) error {
-	return ctx.String(http.StatusOK, data, a...)
+func (ctx Ctx) StringOk(data string, a ...any) error {
+	ctx.Status(http.StatusOK)
+	return ctx.String(data, a...)
+}
+
+// Forbidden just writes a string with a forbidden (403) http status to http response. See String method.
+func (ctx Ctx) StringForbidden(data string, a ...any) error {
+	ctx.Status(http.StatusForbidden)
+	return ctx.String(data, a...)
+}
+
+// BadRequest just writes a string with a bad request (400) http status to http response. See String method.
+func (ctx Ctx) StringBadRequest(data string, a ...any) error {
+	ctx.Status(http.StatusBadRequest)
+	return ctx.String(data, a...)
 }
 
 // InternalServerError just writes a string with a internal server error (500) http status to http response. See String method.
-func (ctx Ctx) InternalServerError(data string, a ...any) error {
-	return ctx.String(http.StatusInternalServerError, data, a...)
+func (ctx Ctx) StringInternalServerError(data string, a ...any) error {
+	ctx.Status(http.StatusInternalServerError)
+	return ctx.String(data, a...)
+}
+
+// Ok sets OK (200) http status to http response. See Status method.
+func (ctx Ctx) Ok() error {
+	ctx.Status(http.StatusOK)
+	return nil
+}
+
+// BadRequest sets bad request (400) http status to http response. See Status method.
+func (ctx Ctx) BadRequest() error {
+	ctx.Status(http.StatusBadRequest)
+	return nil
+}
+
+// NotFound sets not found (404) http status to http response. See Status method.
+func (ctx Ctx) NotFound() error {
+	ctx.Status(http.StatusNotFound)
+	return nil
+}
+
+// InternalServerError sets internal server error (500) http status to http response. See Status method.
+func (ctx Ctx) InternalServerError() error {
+	ctx.Status(http.StatusInternalServerError)
+	return nil
 }
 
 // NoContent just writes no content (204) status.
@@ -171,8 +207,9 @@ func (ctx Ctx) NotContent() error {
 }
 
 // Forbidden just writes a string with a forbidden (403) http status to http response. See String method.
-func (ctx Ctx) Forbidden(data string, a ...any) error {
-	return ctx.String(http.StatusForbidden, data, a...)
+func (ctx Ctx) Forbidden() error {
+	ctx.Status(http.StatusForbidden)
+	return nil
 }
 
 // ParseJson reads http request body, decode it as a Json and stores it in the struct pointed by dst.

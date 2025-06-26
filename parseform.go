@@ -51,7 +51,7 @@ const multipartFormMaxSize = 64 << 20 // 20MB
 //   - time.Time
 func (ctx Ctx) ParseForm(dst any) {
 	contentType := ctx.Req.Header.Get("Content-Type")
-	if strings.HasPrefix(contentType, "multiplart/form-data") && ctx.Req.Form == nil {
+	if strings.HasPrefix(contentType, "multipart/form-data") && ctx.Req.Form == nil {
 		ctx.Req.ParseMultipartForm(multipartFormMaxSize)
 	} else if ctx.Req.Form == nil {
 		ctx.Req.ParseForm()
