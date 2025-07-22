@@ -2,6 +2,7 @@ package templ
 
 import (
 	"html/template"
+	"log"
 	"strings"
 
 	"github.com/deltegui/owl"
@@ -32,48 +33,10 @@ func stringNotEmpty(v string) bool {
 	return len(v) > 0
 }
 
-func boolToYesNo(b bool) string {
-	if b {
-		//return loc.Get("shared.yes")
-		return "Sí"
-	}
-	//return loc.Get("shared.no")
-	return "No"
-}
-
 func createSelectListViewModel(loc localizer.Localizer, name string, items []owl.SelectItem, multiple bool) owl.ViewModel {
 	list := owl.SelectList{
 		Name:     name,
 		Multiple: multiple,
-		Items:    items,
-	}
-	return owl.ViewModel{
-		Model:     list,
-		Localizer: loc,
-	}
-}
-
-func createYesNoSelectListViewModel(loc localizer.Localizer, name string, value *bool) owl.ViewModel {
-	items := []owl.SelectItem{
-		{
-			Value:    "",
-			Tag:      "shared.choose",
-			Selected: value == nil,
-		},
-		{
-			Value:    "1",
-			Tag:      "shared.yes",
-			Selected: value != nil && *value,
-		},
-		{
-			Value:    "0",
-			Tag:      "shared.no",
-			Selected: value != nil && !*value,
-		},
-	}
-	list := owl.SelectList{
-		Name:     name,
-		Multiple: false,
 		Items:    items,
 	}
 	return owl.ViewModel{
@@ -89,19 +52,57 @@ func selectList(loc localizer.Localizer, list owl.SelectList) owl.ViewModel {
 	}
 }
 
+func boolToYesNo(b bool) string {
+	if b {
+		//return loc.Get("shared.yes")
+		return "Sí"
+	}
+	//return loc.Get("shared.no")
+	return "No"
+}
+
+func variadicToArray(elems ...any) []any {
+	return elems
+}
+
+func paramsMap(elems ...any) map[string]any {
+	if len(elems)%2 != 0 {
+		log.Println("Invalid length of argument list passed to map function in view.")
+		return map[string]any{}
+	}
+	var places int = len(elems) / 2
+
+	output := make(map[string]any, places)
+
+	for i := 0; i < len(elems); i += 2 {
+		name := elems[i].(string)
+		value := elems[i+1]
+		output[name] = value
+	}
+
+	return output
+}
+
+func mapKeyExists(m map[string]any, key string) bool {
+	_, ok := m[key]
+	return ok
+}
+
 func CreateDefaultFuncMap() template.FuncMap {
 	return template.FuncMap{
 		"Uppercase":      upperCase,
 		"StringNotEmpty": stringNotEmpty,
-		"BoolToYesNo":    boolToYesNo,
 		"SelectList":     selectList,
+		"BoolToYesNo":    boolToYesNo,
 		"CreateSelectList": func(loc localizer.Localizer, name string, items []owl.SelectItem) owl.ViewModel {
 			return createSelectListViewModel(loc, name, items, false)
 		},
 		"CreateMultipleSelectList": func(loc localizer.Localizer, name string, items []owl.SelectItem) owl.ViewModel {
 			return createSelectListViewModel(loc, name, items, true)
 		},
-		"YesNoSelectList": createYesNoSelectListViewModel,
-		"PlaceErrorList":  placeErrorList,
+		"PlaceErrorList": placeErrorList,
+		"Arr":            variadicToArray,
+		"Map":            paramsMap,
+		"MapKeyExists":   mapKeyExists,
 	}
 }

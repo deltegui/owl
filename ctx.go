@@ -270,6 +270,17 @@ func (ctx Ctx) Render(templ *template.Template, name string, m any) error {
 	return templ.Execute(ctx.Res, createViewModel(ctx, name, m))
 }
 
+/*
+func (ctx Ctx) Render(templ *template.Template, m any) error {
+	definedTemplates := templ.DefinedTemplates()
+	lastIndex := len(definedTemplates) - 1
+	if lastIndex < 0 {
+		panic("Call to render with a template.Template with no parsed templates!")
+	}
+	ctx.RenderLocalized(templ, definedTemplates[lastIndex], m)
+}
+*/
+
 // GetLocalizer creates a Localizer from Json file with the language defined
 // in http cookie.
 func (ctx Ctx) GetLocalizer(file string) localizer.Localizer {
