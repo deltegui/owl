@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/deltegui/valtruc"
@@ -77,9 +78,30 @@ type ValidationError interface {
 type DomainError struct {
 	Code    int
 	Message string
+	wrapped error
+}
+
+func (err DomainError) Wrap(other error) DomainError {
+	return DomainError{
+		Code:    err.Code,
+		Message: err.Message,
+		wrapped: other,
+	}
+}
+
+func (err DomainError) Wrapf(format string, a ...any) DomainError {
+	error := fmt.Errorf(format, a...)
+	return DomainError{
+		Code:    err.Code,
+		Message: err.Message,
+		wrapped: error,
+	}
 }
 
 func (err DomainError) Error() string {
+	if err.wrapped != nil {
+		return fmt.Sprintf("%s: %s", err.Message, err.wrapped.Error())
+	}
 	return err.Message
 }
 

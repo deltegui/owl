@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"log"
 	"net/http"
 
 	"slices"
@@ -49,12 +48,12 @@ func Admin(manager *session.Manager, url string) owl.Middleware {
 		return func(ctx owl.Ctx) error {
 			user, err := manager.ReadSessionCookie(ctx.Req)
 			if err != nil {
-				log.Println("Error while authenticating:", err)
+				ctx.Logger.ErrorContext(ctx.Context(), "Error while authenticating:", err)
 				handleError(ctx, url)
 				return err
 			}
 			if !slices.Contains(user.Roles, core.RoleAdmin) {
-				log.Println("User is not admin!")
+				ctx.Logger.ErrorContext(ctx.Context(), "User is not admin!")
 				handleError(ctx, url)
 				return err
 			}
@@ -67,9 +66,9 @@ func Admin(manager *session.Manager, url string) owl.Middleware {
 func handleError(ctx owl.Ctx, url string) {
 	if len(url) > 0 {
 		http.Redirect(ctx.Res, ctx.Req, url, http.StatusTemporaryRedirect)
-		log.Printf("Authentication failed. Redirecting to url: %s", url)
+		ctx.Logger.ErrorContext(ctx.Context(), "Authentication failed. Redirecting to url: %s", url)
 	} else {
 		ctx.Res.WriteHeader(http.StatusUnauthorized)
-		log.Println("Authentication failed")
+		ctx.Logger.ErrorContext(ctx.Context(), "Authentication failed")
 	}
 }

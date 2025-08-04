@@ -10,6 +10,7 @@ import (
 
 	"github.com/deltegui/owl/core"
 	"github.com/deltegui/owl/localizer"
+	"github.com/deltegui/owl/logx"
 	"github.com/deltegui/valtruc"
 )
 
@@ -43,6 +44,8 @@ type Muxi struct {
 	injector *Injector
 
 	middlewares []Middleware
+
+	Logger logx.Logger
 }
 
 // Creates a new multiplexer with dependency injection container. Needs a core.Cypher
@@ -53,6 +56,7 @@ func NewWithInjector(cy core.Cypher) *Muxi {
 		locStore: nil,
 		cypher:   cy,
 		injector: NewInjector(),
+		Logger:   logx.Default{},
 	}
 }
 
@@ -65,6 +69,7 @@ func (mux *Muxi) createContext(w http.ResponseWriter, req *http.Request, params 
 		locstore:  mux.locStore,
 		validator: valtruc.New(),
 		cypher:    mux.cypher,
+		Logger:    mux.Logger,
 	}
 }
 
@@ -76,6 +81,7 @@ func (mux *Muxi) CreateSubMuxi(prefix string) SubMuxi {
 		middlewares: slices.Clone(mux.middlewares),
 		routePrefix: normalizePath(prefix),
 		injector:    mux.injector.clone(),
+		Logger:      mux.Logger.WithModuleName(prefix),
 	}
 }
 

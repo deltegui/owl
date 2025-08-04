@@ -11,6 +11,7 @@ import (
 	"github.com/deltegui/owl/core"
 	"github.com/deltegui/owl/cypher"
 	"github.com/deltegui/owl/localizer"
+	"github.com/deltegui/owl/logx"
 	"github.com/deltegui/owl/session"
 	"github.com/deltegui/valtruc"
 
@@ -35,6 +36,8 @@ type Ctx struct {
 	validator  valtruc.Valtruc
 	locstore   *localizer.WebStore
 	cypher     core.Cypher
+
+	Logger logx.Logger
 }
 
 // Validates a struct. Will populate ModelState telling if

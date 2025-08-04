@@ -15,6 +15,7 @@ import (
 
 	"github.com/deltegui/owl/core"
 	"github.com/deltegui/owl/localizer"
+	"github.com/deltegui/owl/logx"
 	"github.com/deltegui/valtruc"
 
 	"github.com/julienschmidt/httprouter"
@@ -86,6 +87,8 @@ type Mux struct {
 	middlewares []Middleware
 
 	routePrefix string
+
+	Logger logx.Logger
 }
 
 // Creates a new multiplexer. Needs a core.Cypher
@@ -95,6 +98,7 @@ func New(cy core.Cypher) *Mux {
 		router:   httprouter.New(),
 		locStore: nil,
 		cypher:   cy,
+		Logger:   logx.Default{},
 	}
 }
 
@@ -107,6 +111,7 @@ func (mux *Mux) createContext(w http.ResponseWriter, req *http.Request, params h
 		locstore:  mux.locStore,
 		validator: valtruc.New(),
 		cypher:    mux.cypher,
+		Logger:    mux.Logger,
 	}
 }
 
@@ -117,6 +122,7 @@ func (mux *Mux) CreateSubMux(prefix string) SubMux {
 		cypher:      mux.cypher,
 		middlewares: slices.Clone(mux.middlewares),
 		routePrefix: normalizePath(mux.routePrefix + prefix),
+		Logger:      mux.Logger.WithModuleName(prefix),
 	}
 }
 

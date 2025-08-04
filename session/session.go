@@ -3,7 +3,6 @@ package session
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -189,12 +188,12 @@ func (manager *Manager) GetUserIfValid(id Id) (User, error) {
 
 const cookieKey string = "phx_session"
 
-func (manager *Manager) CreateSessionCookie(w http.ResponseWriter, user User) {
+func (manager *Manager) CreateSessionCookie(w http.ResponseWriter, user User) error {
 	entry := manager.Add(user)
 	age := core.OneDayDuration
 	encoded, err := cypher.EncodeCookie(manager.cypher, string(entry.Id))
 	if err != nil {
-		log.Println("Cannot encrypt session cookie:", err)
+		return fmt.Errorf("cannot encrypt session cookie: %w", err)
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieKey,
@@ -206,6 +205,7 @@ func (manager *Manager) CreateSessionCookie(w http.ResponseWriter, user User) {
 		HttpOnly: true,
 		Secure:   manager.configuration.Secure,
 	})
+	return nil
 }
 
 func readSessionId(req *http.Request, cy core.Cypher) (Id, *http.Cookie, error) {

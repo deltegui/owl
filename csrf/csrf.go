@@ -2,7 +2,6 @@ package csrf
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -31,13 +30,12 @@ func New(expires time.Duration, cipher core.Cypher) *Csrf {
 	}
 }
 
-func (csrf *Csrf) encrypt(raw string) string {
+func (csrf *Csrf) encrypt(raw string) (string, error) {
 	encoded, err := cypher.EncodeCookie(csrf.cipher, raw)
 	if err != nil {
-		log.Println("Cannot encode csrf token:", err)
-		return ""
+		return "", fmt.Errorf("cannot encode csrf token: %w", err)
 	}
-	return encoded
+	return encoded, nil
 }
 
 func (csrf *Csrf) decrypt(token string) (string, error) {
@@ -51,12 +49,11 @@ func (csrf *Csrf) decrypt(token string) (string, error) {
 const tokenDelimiter string = "::"
 
 // Generates a random csrf token
-func (csrf Csrf) Generate() string {
+func (csrf Csrf) Generate() (string, error) {
 	unixTime := time.Now().Unix()
 	random := core.GenerateToken(core.Size64)
 	raw := fmt.Sprintf("%s%s%d", random, tokenDelimiter, unixTime)
-	e := csrf.encrypt(raw)
-	return e
+	return csrf.encrypt(raw)
 }
 
 // Checks a csrf token. Returns an nil error if the csrf token is valid. Otherwise
