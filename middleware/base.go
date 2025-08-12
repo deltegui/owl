@@ -8,10 +8,14 @@ import (
 func Logger(next owl.Handler) owl.Handler {
 	return func(ctx owl.Ctx) error {
 		ctx.Logger.Info(
-			"[OWL] request from %s (%s) to (%s) %s",
+			"Request info",
+			"address",
 			ctx.Req.RemoteAddr,
+			"agent",
 			ctx.Req.UserAgent(),
+			"method",
 			ctx.Req.Method,
+			"uri",
 			ctx.Req.RequestURI)
 		return next(ctx)
 	}

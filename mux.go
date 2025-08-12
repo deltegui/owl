@@ -135,10 +135,10 @@ func (mux *Mux) CreateSubMux(prefix string) SubMux {
 //
 //	mux.Handle(http.MethodGet, "/index", indexHandler)
 func (mux *Mux) Handle(method, pattern string, handler Handler, middlewares ...Middleware) {
-	for _, m := range middlewares {
+	for _, m := range slices.Backward(middlewares) {
 		handler = m(handler)
 	}
-	for _, m := range mux.middlewares {
+	for _, m := range slices.Backward(mux.middlewares) {
 		handler = m(handler)
 	}
 

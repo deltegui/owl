@@ -129,10 +129,10 @@ func (mux *Muxi) Add(builder Builder) {
 // Where NewDependecy is a builder that produces the type 'dependency'.
 func (mux *Muxi) Handle(method, pattern string, builder Builder, middlewares ...Middleware) {
 	handler := mux.injector.ResolveHandler(builder)
-	for _, m := range middlewares {
+	for _, m := range slices.Backward(middlewares) {
 		handler = m(handler)
 	}
-	for _, m := range mux.middlewares {
+	for _, m := range slices.Backward(mux.middlewares) {
 		handler = m(handler)
 	}
 	mux.router.Handle(method, normalizePath(mux.routePrefix+pattern), func(w http.ResponseWriter, req *http.Request, params httprouter.Params) {

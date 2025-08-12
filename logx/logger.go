@@ -87,11 +87,31 @@ func (logger Default) WithModuleName(module string) Logger {
 	}
 }
 
+func (logger Default) Log(level Level, msg string, args ...any) {
+	var start string
+	switch level {
+	case LevelWarn:
+		start = "[WARN]"
+	case LevelDebug:
+		start = "[DEBUG]"
+	case LevelError:
+		start = "[ERROR]"
+	case LevelInfo:
+		start = "[INFO]"
+	}
+	start = start + " "
+	if len(logger.module) != 0 {
+		start = start + "(MODULE: " + logger.module + ") "
+	}
+	args = append([]any{start + msg}, args...)
+	log.Println(args...)
+}
+
 func (logger Default) Info(msg string, args ...any) {
 	if logger.Level > LevelInfo {
 		return
 	}
-	log.Printf("[INFO] "+msg, args...)
+	logger.Log(LevelInfo, msg, args...)
 }
 
 func (logger Default) InfoContext(ctx context.Context, msg string, args ...any) {
@@ -102,7 +122,7 @@ func (logger Default) Warn(msg string, args ...any) {
 	if logger.Level > LevelWarn {
 		return
 	}
-	log.Printf("[WARN] "+msg, args...)
+	logger.Log(LevelWarn, msg, args...)
 }
 
 func (logger Default) WarnContext(ctx context.Context, msg string, args ...any) {
@@ -113,7 +133,7 @@ func (logger Default) Error(msg string, args ...any) {
 	if logger.Level > LevelError {
 		return
 	}
-	log.Printf("[ERROR] "+msg, args...)
+	logger.Log(LevelError, msg, args...)
 }
 
 func (logger Default) ErrorContext(ctx context.Context, msg string, args ...any) {
@@ -124,7 +144,8 @@ func (logger Default) Debug(msg string, args ...any) {
 	if logger.Level > LevelDebug {
 		return
 	}
-	log.Printf("[DEBUG] "+msg, args...)
+	logger.Log(LevelDebug, msg, args...)
+
 }
 
 func (logger Default) DebugContext(ctx context.Context, msg string, args ...any) {
