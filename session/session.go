@@ -13,11 +13,17 @@ import (
 
 type Id string
 
+type Claim string
+
+const (
+	ClaimImage Claim = "Image"
+	ClaimName  Claim = "Name"
+)
+
 type User struct {
-	Id    int64
-	Name  string
-	Roles []core.Role
-	Image string
+	Id     int64
+	Roles  []core.Role
+	Claims map[Claim]string
 }
 
 type Entry struct {

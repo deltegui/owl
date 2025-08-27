@@ -62,11 +62,11 @@ func (vm ViewModel) GetFormError(key string) string {
 	if len(val) == 0 {
 		return ""
 	}
-	return vm.formatError(key, val[0])
+	return vm.formatError(val[0])
 }
 
-func (vm ViewModel) formatError(key string, err core.ValidationError) string {
-	locKey := vm.Localize(key)
+func (vm ViewModel) formatError(err core.ValidationError) string {
+	locKey := vm.Localize(err.GetFieldName())
 	locVal := vm.Localize(string(err.GetIdentifier()), locKey)
 	finalVal := err.Format(locVal)
 	return finalVal
@@ -82,7 +82,7 @@ func (vm ViewModel) GetAllFormErrors(key string) []string {
 		return output
 	}
 	for _, err := range val {
-		output = append(output, vm.formatError(key, err))
+		output = append(output, vm.formatError(err))
 	}
 	return output
 }

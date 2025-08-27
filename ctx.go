@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/deltegui/owl/core"
@@ -58,6 +59,10 @@ func (ctx *Ctx) Validate(target any) {
 	for _, e := range errs {
 		valtrucErr := e.(valtruc.ValidationError)
 		fieldname := valtrucErr.GetFieldName()
+		if len(valtrucErr.Path()) > 0 {
+			path := strings.Join(valtrucErr.Path(), ".")
+			fieldname = path + "." + valtrucErr.GetFieldName()
+		}
 		state.Errors[fieldname] = append(state.Errors[fieldname], valtrucErr)
 	}
 
