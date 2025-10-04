@@ -144,7 +144,7 @@ func setDateTime(field reflect.Value, value string, isPointer bool) bool {
 	if len(value) == 0 {
 		return false
 	}
-	time, err := time.Parse("2006-01-02T15:04", value)
+	time, err := time.Parse(time.RFC3339, value)
 	if err != nil {
 		return false
 	}

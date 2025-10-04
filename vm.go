@@ -100,6 +100,21 @@ type SelectList struct {
 	Items    []SelectItem
 }
 
+func (list *SelectList) ClearSelection() {
+	for i := 0; i < len(list.Items); i++ {
+		list.Items[i].Selected = false
+	}
+}
+
+func (list *SelectList) Select(v string) {
+	list.ClearSelection()
+	for i := 0; i < len(list.Items); i++ {
+		if list.Items[i].Value == v {
+			list.Items[i].Selected = true
+		}
+	}
+}
+
 func CreateSelectListViewModel(loc localizer.Localizer, name string, items []SelectItem, multiple bool) ViewModel {
 	list := SelectList{
 		Name:     name,

@@ -104,5 +104,6 @@ func CreateDefaultFuncMap() template.FuncMap {
 		"Arr":            variadicToArray,
 		"Map":            paramsMap,
 		"MapKeyExists":   mapKeyExists,
+		"ToHTML":         func(input string) template.HTML { return template.HTML(input) },
 	}
 }
