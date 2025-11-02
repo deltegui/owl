@@ -1,6 +1,6 @@
 # owl
 
-![Logo](https://raw.githubusercontent.com/deltegui/owl/refs/heads/main/logo.png)
+![Logo](https://raw.githubusercontent.com/deltegui/owl/refs/heads/main/logo.svg)
 
 Owl is a highly opinionated framework for Go.
 
