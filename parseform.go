@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/deltegui/owl/core"
+	"github.com/deltegui/owl/v3/core"
 )
 
 const multipartFormMaxSize = 64 << 20 // 20MB

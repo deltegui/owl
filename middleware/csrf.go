@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/deltegui/owl"
-	"github.com/deltegui/owl/csrf"
+	"github.com/deltegui/owl/v3"
+	"github.com/deltegui/owl/v3/csrf"
 )
 
 func Csrf(cs *csrf.Csrf) owl.Middleware {

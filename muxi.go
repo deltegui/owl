@@ -1,17 +1,9 @@
 package owl
 
 import (
-	"embed"
-	"fmt"
 	"net/http"
-	"slices"
 
-	"github.com/julienschmidt/httprouter"
-
-	"github.com/deltegui/owl/core"
-	"github.com/deltegui/owl/localizer"
-	"github.com/deltegui/owl/logx"
-	"github.com/deltegui/valtruc"
+	"github.com/deltegui/owl/v3/core"
 )
 
 type SubMuxi interface {
@@ -35,54 +27,18 @@ type SubMuxi interface {
 
 // Muxi is a HTTP multiplexer (router) with a dependency injection container.
 type Muxi struct {
-	router   *httprouter.Router
-	cypher   core.Cypher
-	locStore *localizer.WebStore
-
-	routePrefix string
-
+	base
 	injector *Injector
-
-	middlewares []Middleware
-
-	Logger logx.Logger
 }
 
 // Creates a new multiplexer with dependency injection container. Needs a core.Cypher
 // implementation to automatically do some encryptation like cookies security.
 func NewWithInjector(cy core.Cypher) *Muxi {
-	return &Muxi{
-		router:   httprouter.New(),
-		locStore: nil,
-		cypher:   cy,
-		injector: NewInjector(),
-		Logger:   logx.Default{},
-	}
-}
-
-func (mux *Muxi) createContext(w http.ResponseWriter, req *http.Request, params httprouter.Params) Ctx {
-	return Ctx{
-		Req:       req,
-		Res:       w,
-		params:    params,
-		ctx:       req.Context(),
-		locstore:  mux.locStore,
-		validator: valtruc.New(),
-		cypher:    mux.cypher,
-		Logger:    mux.Logger,
-	}
+	return &Muxi{base: newBase(cy), injector: NewInjector()}
 }
 
 func (mux *Muxi) CreateSubMuxi(prefix string) SubMuxi {
-	return &Muxi{
-		router:      mux.router,
-		locStore:    mux.locStore,
-		cypher:      mux.cypher,
-		middlewares: slices.Clone(mux.middlewares),
-		routePrefix: normalizePath(prefix),
-		injector:    mux.injector.clone(),
-		Logger:      mux.Logger.WithModuleName(prefix),
-	}
+	return &Muxi{base: mux.base.sub(prefix), injector: mux.injector.clone()}
 }
 
 // Run is a function that runs a Runner. Show Runner type for more information.
@@ -128,17 +84,7 @@ func (mux *Muxi) Add(builder Builder) {
 //
 // Where NewDependecy is a builder that produces the type 'dependency'.
 func (mux *Muxi) Handle(method, pattern string, builder Builder, middlewares ...Middleware) {
-	handler := mux.injector.ResolveHandler(builder)
-	for _, m := range slices.Backward(middlewares) {
-		handler = m(handler)
-	}
-	for _, m := range slices.Backward(mux.middlewares) {
-		handler = m(handler)
-	}
-	mux.router.Handle(method, normalizePath(mux.routePrefix+pattern), func(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
-		ctx := mux.createContext(w, req, params)
-		handler(ctx)
-	})
+	mux.register(method, pattern, mux.injector.ResolveHandler(builder), middlewares)
 }
 
 // Get registers a handler to a particular pattern and HTTP Get method. See Handle method.
@@ -179,45 +125,4 @@ func (mux *Muxi) Put(pattern string, builder Builder, middlewares ...Middleware)
 // Trace registers a handler to a particular pattern and HTTP Trace method. See Handle method.
 func (mux *Muxi) Trace(pattern string, builder Builder, middlewares ...Middleware) {
 	mux.Handle(http.MethodTrace, pattern, builder, middlewares...)
-}
-
-// Creates a static file server in the requested dir path.
-func (mux *Muxi) Static(path string) {
-	mux.router.NotFound = http.FileServer(http.Dir(path))
-}
-
-// Creates a static file server with the requested embedded file system.
-func (mux *Muxi) StaticEmbedded(fs embed.FS) {
-	mux.router.NotFound = http.FileServer(http.FS(fs))
-}
-
-// Creates a static file server in the requested dir URL and path.
-func (mux *Muxi) StaticMount(url, path string) {
-	mux.router.ServeFiles(fmt.Sprintf("%s/*filepath", url), http.Dir(path))
-}
-
-// Creates a static file server in the requested dir URL and embedded file system.
-func (mux *Muxi) StaticMountEmbedded(url string, fs embed.FS) {
-	mux.router.ServeFiles(fmt.Sprintf("%s/*filepath", url), http.FS(fs))
-}
-
-// Listen starts owl's server
-func (mux Muxi) Listen(address string) {
-	server := http.Server{
-		Addr:    address,
-		Handler: mux.router,
-	}
-	go startServer(&server)
-	waitAndStopServer(&server)
-}
-
-// AddLocalization creates a new WebLocalizerStore using the provided parameters.
-func (mux *Muxi) AddLocalization(fs embed.FS, sharedKey, errorKey string) {
-	store := localizer.NewWebLocalizerStore(fs, sharedKey, errorKey, mux.cypher)
-	mux.locStore = &store
-}
-
-// Use middleware globally.
-func (mux *Muxi) Use(middleware Middleware) {
-	mux.middlewares = append(mux.middlewares, middleware)
 }

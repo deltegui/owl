@@ -9,10 +9,11 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"sync"
 	"time"
 
-	"github.com/deltegui/owl/core"
-	"github.com/deltegui/owl/cypher"
+	"github.com/deltegui/owl/v3/core"
+	"github.com/deltegui/owl/v3/cypher"
 )
 
 // Localizer is a map of key and translations.
@@ -48,6 +49,9 @@ const (
 
 const fallbackLanguage string = LangSpanish
 
+// DefaultLanguage is the language used when a request has no language cookie.
+const DefaultLanguage = fallbackLanguage
+
 const cookieKey string = "language"
 
 // A localizer store is a system to get a Localizer
@@ -60,29 +64,52 @@ func NewLocalizerStore(files embed.FS) Store {
 	return Store{files}
 }
 
-func (ls Store) loadFile(file string) i18n {
+// warned remembers what has been reported, so a file that is missing is told
+// once and not on every request.
+var warned sync.Map
+
+func warnOnce(msg string, args ...any) {
+	text := fmt.Sprintf(msg, args...)
+	if _, seen := warned.LoadOrStore(text, true); !seen {
+		log.Println("owl localizer:", text)
+	}
+}
+
+func (ls Store) loadFile(file string) (i18n, error) {
 	raw, err := ls.files.ReadFile(file)
 	if err != nil {
-		log.Panicln("Error while reading file ", file, err)
+		return nil, fmt.Errorf("cannot read file %s: %w", file, err)
 	}
 	var values i18n
 	if err = json.Unmarshal(raw, &values); err != nil {
-		log.Panicln("Error while decoding localization file ", file, err)
+		return nil, fmt.Errorf("cannot decode file %s: %w", file, err)
 	}
-	return values
+	return values, nil
 }
 
 // Gets a Localizer reading a json file identified by 'key'
 // and then reads the language defined in that file.
+//
+// A file that does not exist, or is not valid, does not stop the request: it is
+// reported once in the log and the Localizer is empty, so every key shows as itself.
+// The same if the file has neither the language nor the fallback one.
 func (ls Store) Get(key, language string) Localizer {
 	key = fmt.Sprintf("%s.json", key)
-	values := ls.loadFile(key)
+	values, err := ls.loadFile(key)
+	if err != nil {
+		warnOnce("%v", err)
+		return Localizer{}
+	}
 	val, ok := values[language]
 	if !ok {
 		val, ok = values[fallbackLanguage]
 		if !ok {
-			log.Panicf("Failed to load fallback language ('%s') localizations for key '%s'\n", fallbackLanguage, key)
+			warnOnce("file %s has neither '%s' nor the fallback language ('%s')", key, language, fallbackLanguage)
+			return Localizer{}
 		}
+	}
+	if val == nil {
+		return Localizer{}
 	}
 	return val
 }

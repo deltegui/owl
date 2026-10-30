@@ -7,7 +7,7 @@ import (
 
 	"slices"
 
-	"github.com/deltegui/owl"
+	"github.com/deltegui/owl/v3"
 )
 
 const (
@@ -98,7 +98,7 @@ func Cors(opt CorsOptions) owl.Middleware {
 					return ctx.StringForbidden("Request headers not allowed")
 				}
 
-				return ctx.NotContent()
+				return ctx.NoContent()
 			}
 			if !opt.isMethodAllowed(ctx.Req.Method) {
 				return ctx.StringForbidden("Method not allowed by CORS: %s", ctx.Req.Method)

@@ -8,17 +8,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"slices"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/deltegui/owl/core"
-	"github.com/deltegui/owl/localizer"
-	"github.com/deltegui/owl/logx"
-	"github.com/deltegui/valtruc"
-
-	"github.com/julienschmidt/httprouter"
+	"github.com/deltegui/owl/v3/core"
 )
 
 // SubMux represents a subrouter within the Owl framework.
@@ -78,52 +72,19 @@ type Handler func(ctx Ctx) error
 // any handler. Lets you do many things, like authentication, logging, ...
 type Middleware func(next Handler) Handler
 
-// Muxi is a HTTP multiplexer (router).
+// Mux is a HTTP multiplexer (router).
 type Mux struct {
-	router   *httprouter.Router
-	cypher   core.Cypher
-	locStore *localizer.WebStore
-
-	middlewares []Middleware
-
-	routePrefix string
-
-	Logger logx.Logger
+	base
 }
 
 // Creates a new multiplexer. Needs a core.Cypher
 // implementation to automatically do some encryptation like cookies security.
 func New(cy core.Cypher) *Mux {
-	return &Mux{
-		router:   httprouter.New(),
-		locStore: nil,
-		cypher:   cy,
-		Logger:   logx.Default{},
-	}
-}
-
-func (mux *Mux) createContext(w http.ResponseWriter, req *http.Request, params httprouter.Params) Ctx {
-	return Ctx{
-		Req:       req,
-		Res:       w,
-		params:    params,
-		ctx:       req.Context(),
-		locstore:  mux.locStore,
-		validator: valtruc.New(),
-		cypher:    mux.cypher,
-		Logger:    mux.Logger,
-	}
+	return &Mux{base: newBase(cy)}
 }
 
 func (mux *Mux) CreateSubMux(prefix string) SubMux {
-	return &Mux{
-		router:      mux.router,
-		locStore:    mux.locStore,
-		cypher:      mux.cypher,
-		middlewares: slices.Clone(mux.middlewares),
-		routePrefix: normalizePath(mux.routePrefix + prefix),
-		Logger:      mux.Logger.WithModuleName(prefix),
-	}
+	return &Mux{base: mux.base.sub(prefix)}
 }
 
 // Handle registers a http Handle to a particular HTTP method and pattern.
@@ -135,17 +96,7 @@ func (mux *Mux) CreateSubMux(prefix string) SubMux {
 //
 //	mux.Handle(http.MethodGet, "/index", indexHandler)
 func (mux *Mux) Handle(method, pattern string, handler Handler, middlewares ...Middleware) {
-	for _, m := range slices.Backward(middlewares) {
-		handler = m(handler)
-	}
-	for _, m := range slices.Backward(mux.middlewares) {
-		handler = m(handler)
-	}
-
-	mux.router.Handle(method, normalizePath(mux.routePrefix+pattern), func(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
-		ctx := mux.createContext(w, req, params)
-		handler(ctx)
-	})
+	mux.register(method, pattern, handler, middlewares)
 }
 
 func normalizePath(path string) string {
@@ -209,35 +160,6 @@ func (mux *Mux) Trace(pattern string, handler Handler, middlewares ...Middleware
 	mux.Handle(http.MethodTrace, pattern, handler, middlewares...)
 }
 
-// Creates a static file server in the requested dir path.
-func (mux *Mux) Static(path string) {
-	//mux.router.NotFound = http.FileServer(http.Dir(path))
-	mux.router.NotFound = mux.createNotFoundHandler(http.Dir(path))
-}
-
-// Creates a static file server with the requested embedded file system.
-func (mux *Mux) StaticEmbedded(fs embed.FS) {
-	// mux.router.NotFound = http.FileServer(http.FS(fs))
-	mux.router.NotFound = mux.createNotFoundHandler(http.FS(fs))
-}
-
-func (mux *Mux) createNotFoundHandler(root http.FileSystem) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		http.FileServer(root).ServeHTTP(w, r)
-	})
-}
-
-// Creates a static file server in the requested dir URL and path.
-func (mux *Mux) StaticMount(url, path string) {
-	mux.router.ServeFiles(fmt.Sprintf("%s/*filepath", url), http.Dir(path))
-}
-
-// Creates a static file server in the requested dir URL and embedded file system.
-func (mux *Mux) StaticMountEmbedded(url string, fs embed.FS) {
-	mux.router.ServeFiles(fmt.Sprintf("%s/*filepath", url), http.FS(fs))
-}
-
 func startServer(server *http.Server) {
 	log.Println("Listening on address: ", server.Addr)
 	log.Println("You are ready to GO!")
@@ -265,27 +187,6 @@ func waitAndStopServer(server *http.Server) {
 	}
 
 	log.Print("Server exited properly")
-}
-
-// Listen starts owl's server
-func (mux Mux) Listen(address string) {
-	server := http.Server{
-		Addr:    address,
-		Handler: mux.router,
-	}
-	go startServer(&server)
-	waitAndStopServer(&server)
-}
-
-// AddLocalization creates a new WebLocalizerStore using the provided parameters.
-func (mux *Mux) AddLocalization(fs embed.FS, sharedKey, errorKey string) {
-	store := localizer.NewWebLocalizerStore(fs, sharedKey, errorKey, mux.cypher)
-	mux.locStore = &store
-}
-
-// Use middleware globally.
-func (mux *Mux) Use(middleware Middleware) {
-	mux.middlewares = append(mux.middlewares, middleware)
 }
 
 // Redirects request to URL.

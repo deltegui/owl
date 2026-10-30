@@ -5,8 +5,8 @@ import (
 	"log"
 	"strings"
 
-	"github.com/deltegui/owl"
-	"github.com/deltegui/owl/localizer"
+	"github.com/deltegui/owl/v3"
+	"github.com/deltegui/owl/v3/localizer"
 )
 
 func placeErrorList(vm owl.ViewModel, key string) template.HTML {

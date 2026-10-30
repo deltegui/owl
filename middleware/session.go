@@ -5,9 +5,9 @@ import (
 
 	"slices"
 
-	"github.com/deltegui/owl"
-	"github.com/deltegui/owl/core"
-	"github.com/deltegui/owl/session"
+	"github.com/deltegui/owl/v3"
+	"github.com/deltegui/owl/v3/core"
+	"github.com/deltegui/owl/v3/session"
 )
 
 func Authorize(manager *session.Manager, url string) owl.Middleware {

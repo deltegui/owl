@@ -10,7 +10,7 @@ import (
 	"io"
 	"log"
 
-	"github.com/deltegui/owl/core"
+	"github.com/deltegui/owl/v3/core"
 )
 
 // AES256 is an implementation of the interface core.Cypher using

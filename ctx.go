@@ -3,21 +3,26 @@ package owl
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/deltegui/owl/core"
-	"github.com/deltegui/owl/cypher"
-	"github.com/deltegui/owl/localizer"
-	"github.com/deltegui/owl/logx"
-	"github.com/deltegui/owl/session"
+	"github.com/deltegui/owl/v3/core"
+	"github.com/deltegui/owl/v3/cypher"
+	"github.com/deltegui/owl/v3/localizer"
+	"github.com/deltegui/owl/v3/logx"
+	"github.com/deltegui/owl/v3/session"
 	"github.com/deltegui/valtruc"
 
 	"github.com/julienschmidt/httprouter"
 )
+
+// ErrNoLocalization is what ChangeLanguage returns when AddLocalization was not called.
+var ErrNoLocalization = errors.New("owl: localization is not configured, call AddLocalization")
 
 // Ctx represents the request Context. This includes:
 // - http.Request
@@ -36,6 +41,7 @@ type Ctx struct {
 	ModelState core.ModelState
 	validator  valtruc.Valtruc
 	locstore   *localizer.WebStore
+	renderer   Renderer
 	cypher     core.Cypher
 
 	Logger logx.Logger
@@ -155,9 +161,24 @@ func (ctx Ctx) JsonOk(data any) error {
 // String just writes a string with a status to http response. Supports string format. Example:
 //
 //	ctx.String("Hello %s for %d time", "Manolito", 3)
+//
+// Without arguments the text is written as it is, so a "%" in it (for example in
+// text that comes from a user) is not taken for a format.
 func (ctx Ctx) String(data string, a ...any) error {
-	fmt.Fprintf(ctx.Res, data, a...)
-	return nil
+	var err error
+	if len(a) == 0 {
+		_, err = io.WriteString(ctx.Res, data)
+	} else {
+		_, err = fmt.Fprintf(ctx.Res, data, a...)
+	}
+	return err
+}
+
+// Text writes the text as it is. Unlike String it is not a format, so it is what
+// to use with text that comes from somewhere else (a "%" in it is only a "%").
+func (ctx Ctx) Text(data string) error {
+	_, err := io.WriteString(ctx.Res, data)
+	return err
 }
 
 // Ok just writes a string with a ok (200) http status to http response. See String method.
@@ -209,9 +230,20 @@ func (ctx Ctx) InternalServerError() error {
 }
 
 // NoContent just writes no content (204) status.
-func (ctx Ctx) NotContent() error {
+func (ctx Ctx) NoContent() error {
 	ctx.Res.WriteHeader(http.StatusNoContent)
 	return nil
+}
+
+// NotContent is the old, misspelled name of NoContent.
+//
+// Deprecated: use NoContent.
+func (ctx Ctx) NotContent() error { return ctx.NoContent() }
+
+// StringNotFound just writes a string with a not found (404) http status to http response. See String method.
+func (ctx Ctx) StringNotFound(data string, a ...any) error {
+	ctx.Status(http.StatusNotFound)
+	return ctx.String(data, a...)
 }
 
 // Forbidden just writes a string with a forbidden (403) http status to http response. See String method.
@@ -343,12 +375,20 @@ func (ctx Ctx) GetUser() session.User {
 }
 
 // GetCurrentLanguage get current cookie defined language.
+// Without localization (see AddLocalization) it is the default language.
 func (ctx *Ctx) GetCurrentLanguage() string {
+	if ctx.locstore == nil {
+		return localizer.DefaultLanguage
+	}
 	return ctx.locstore.ReadCookie(ctx.Req)
 }
 
 // ChangeLanguage changes current cookie defined language.
+// It returns ErrNoLocalization if the multiplexer has none (see AddLocalization).
 func (ctx *Ctx) ChangeLanguage(to string) error {
+	if ctx.locstore == nil {
+		return ErrNoLocalization
+	}
 	return ctx.locstore.CreateCookie(ctx.Res, to)
 }
 

@@ -3,7 +3,7 @@ package cypher
 import (
 	"encoding/base64"
 
-	"github.com/deltegui/owl/core"
+	"github.com/deltegui/owl/v3/core"
 )
 
 // EncodeCookie is a function that encodes a cookie data using a Cypher implementation.

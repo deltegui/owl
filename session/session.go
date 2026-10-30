@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/deltegui/owl/core"
-	"github.com/deltegui/owl/cypher"
+	"github.com/deltegui/owl/v3/core"
+	"github.com/deltegui/owl/v3/cypher"
 )
 
 type Id string

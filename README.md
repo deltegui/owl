@@ -128,9 +128,9 @@ Store your localized strings for your view in view.html.json:
 Just run this inside your project:
 
 ```
-go get -u github.com/deltegui/owl
+go get -u github.com/deltegui/owl/v3
 ```
 
 ## Resources
 
-- [Go reference](https://pkg.go.dev/github.com/deltegui/owl)
+- [Go reference](https://pkg.go.dev/github.com/deltegui/owl/v3)

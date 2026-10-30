@@ -3,9 +3,9 @@ package owl
 import (
 	"html/template"
 
-	"github.com/deltegui/owl/core"
-	"github.com/deltegui/owl/csrf"
-	"github.com/deltegui/owl/localizer"
+	"github.com/deltegui/owl/v3/core"
+	"github.com/deltegui/owl/v3/csrf"
+	"github.com/deltegui/owl/v3/localizer"
 )
 
 type ViewModel struct {
@@ -155,3 +155,7 @@ func CreateYesNoSelectListViewModel(loc localizer.Localizer, name string, value 
 		Localizer: loc,
 	}
 }
+
+// FormatError translates a validation error the way GetFormError does, for code
+// that builds its own answer (for example a JSON one).
+func (vm ViewModel) FormatError(err core.ValidationError) string { return vm.formatError(err) }
