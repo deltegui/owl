@@ -235,11 +235,6 @@ func (ctx Ctx) NoContent() error {
 	return nil
 }
 
-// NotContent is the old, misspelled name of NoContent.
-//
-// Deprecated: use NoContent.
-func (ctx Ctx) NotContent() error { return ctx.NoContent() }
-
 // StringNotFound just writes a string with a not found (404) http status to http response. See String method.
 func (ctx Ctx) StringNotFound(data string, a ...any) error {
 	ctx.Status(http.StatusNotFound)
