@@ -77,9 +77,9 @@ type Mux struct {
 	base
 }
 
-// Creates a new multiplexer. Needs a core.Cypher
+// Creates a new multiplexer. Needs a core.Cipher
 // implementation to automatically do some encryptation like cookies security.
-func New(cy core.Cypher) *Mux {
+func New(cy core.Cipher) *Mux {
 	return &Mux{base: newBase(cy)}
 }
 

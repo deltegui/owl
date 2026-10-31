@@ -2,21 +2,38 @@ package middleware
 
 import (
 	"net/http"
-
 	"slices"
+	"strings"
 
 	"github.com/deltegui/owl/v3"
 	"github.com/deltegui/owl/v3/core"
 	"github.com/deltegui/owl/v3/session"
 )
 
-func Authorize(manager *session.Manager, url string) owl.Middleware {
+// Authorize lets through the requests with a session and leaves the user in the
+// context (see Ctx.User). Without one, a browser (it accepts text/html) is sent to
+// loginURL with a 303, and anything else, or every request if loginURL is empty,
+// gets a 401.
+func Authorize(manager *session.Manager, loginURL string) owl.Middleware {
+	return AuthorizeRoles(manager, loginURL)
+}
+
+// AuthorizeRoles is Authorize and, besides, the user must have one of the roles, or
+// the answer is a 403 (they are logged in: sending them to the login would not help).
+// With no roles, any user passes.
+func AuthorizeRoles(manager *session.Manager, loginURL string, roles ...core.Role) owl.Middleware {
 	return func(next owl.Handler) owl.Handler {
 		return func(ctx owl.Ctx) error {
-			user, err := manager.ReadSessionCookie(ctx.Req)
+			user, err := manager.User(ctx.Res, ctx.Req)
 			if err != nil {
-				handleError(ctx, url)
-				return err
+				ctx.Logger.InfoContext(ctx.Context(), "authentication failed", "error", err.Error())
+				deny(ctx, loginURL)
+				return nil
+			}
+			if len(roles) > 0 && !slices.ContainsFunc(roles, user.HasRole) {
+				ctx.Logger.InfoContext(ctx.Context(), "user has none of the roles", "user", user.Id)
+				http.Error(ctx.Res, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				return nil
 			}
 			ctx.Set(session.ContextKey, user)
 			return next(ctx)
@@ -24,51 +41,15 @@ func Authorize(manager *session.Manager, url string) owl.Middleware {
 	}
 }
 
-func AuthorizeRoles(manager *session.Manager, url string, roles []core.Role) owl.Middleware {
-	return func(next owl.Handler) owl.Handler {
-		return func(ctx owl.Ctx) error {
-			user, err := manager.ReadSessionCookie(ctx.Req)
-			if err != nil {
-				handleError(ctx, url)
-				return err
-			}
-			for _, userRole := range user.Roles {
-				if slices.Contains(roles, userRole) {
-					return next(ctx)
-				}
-			}
-			handleError(ctx, url)
-			return nil
-		}
-	}
+// Admin is AuthorizeRoles for core.RoleAdmin.
+func Admin(manager *session.Manager, loginURL string) owl.Middleware {
+	return AuthorizeRoles(manager, loginURL, core.RoleAdmin)
 }
 
-func Admin(manager *session.Manager, url string) owl.Middleware {
-	return func(next owl.Handler) owl.Handler {
-		return func(ctx owl.Ctx) error {
-			user, err := manager.ReadSessionCookie(ctx.Req)
-			if err != nil {
-				ctx.Logger.ErrorContext(ctx.Context(), "Error while authenticating:", err)
-				handleError(ctx, url)
-				return err
-			}
-			if !slices.Contains(user.Roles, core.RoleAdmin) {
-				ctx.Logger.ErrorContext(ctx.Context(), "User is not admin!")
-				handleError(ctx, url)
-				return err
-			}
-			ctx.Set(session.ContextKey, user)
-			return next(ctx)
-		}
+func deny(ctx owl.Ctx, loginURL string) {
+	if loginURL != "" && strings.Contains(ctx.Req.Header.Get("Accept"), "text/html") {
+		http.Redirect(ctx.Res, ctx.Req, loginURL, http.StatusSeeOther)
+		return
 	}
-}
-
-func handleError(ctx owl.Ctx, url string) {
-	if len(url) > 0 {
-		http.Redirect(ctx.Res, ctx.Req, url, http.StatusTemporaryRedirect)
-		ctx.Logger.ErrorContext(ctx.Context(), "Authentication failed. Redirecting to url: %s", url)
-	} else {
-		ctx.Res.WriteHeader(http.StatusUnauthorized)
-		ctx.Logger.ErrorContext(ctx.Context(), "Authentication failed")
-	}
+	http.Error(ctx.Res, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 }

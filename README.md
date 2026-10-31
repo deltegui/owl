@@ -67,10 +67,12 @@ func handleProcessLogin(service accountService, sessionManager *session.Manager)
 
 		account, _ := service.login(accountDto{Name: form.Name, Password: form.Password}) // Call your service
 
-		sessionManager.CreateSessionCookie(ctx.Res, session.User{
-			Id:   account.IdUser,
-			Name: account.Name,
-		})
+		if err := sessionManager.Create(ctx.Req.Context(), ctx.Res, session.User{
+			Id:     account.IdUser,
+			Claims: map[session.Claim]string{"Name": account.Name},
+		}); err != nil {
+			return err
+		}
 		_ = ctx.ChangeLanguage(account.ProfileLang)
 
 		return ctx.Redirect("/panel")
@@ -78,7 +80,10 @@ func handleProcessLogin(service accountService, sessionManager *session.Manager)
 }
 
 func main() {
-	cy := cypher.New()
+	cy, err := cipher.New() // AES-256-GCM with a random key; use cipher.NewFromStrings(key) to keep it across restarts.
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	r := owl.NewWithInjector() // Create a new router with a dependency injection container. If you dont like / need a dependency injection container you can just use owl.New().
 	r.StaticEmbedded(static.Files) // Create a mountpoint for static files.
@@ -86,8 +91,8 @@ func main() {
 
 	r.Add(newAccountService()) // Register your account service
 	r.Add(func() *session.Manager {
-		return session.NewInMemoryManager()
-	}) // Register a session manager with in-memory persistence.
+		return session.NewManager(cy) // Sessions in memory, a day without use, Secure cookie. See the options (WithStore, WithMaxAge, WithSecure...).
+	}) // Register a session manager. Protect routes with middleware.Authorize(manager, "/login").
 
 	sub := r.CreateSubMux("/account") // Creates a subrouter mounted in the URL /account
 	sub.Post("/login", handleProcessLogin) // Automatically will wire your dependencies.

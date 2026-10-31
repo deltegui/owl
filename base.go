@@ -19,7 +19,7 @@ import (
 // prefix and its own list of middlewares.
 type base struct {
 	router   *httprouter.Router
-	cypher   core.Cypher
+	cipher   core.Cipher
 	locStore *webstore.Store
 
 	middlewares []Middleware
@@ -28,8 +28,8 @@ type base struct {
 	Logger logx.Logger
 }
 
-func newBase(cy core.Cypher) base {
-	return base{router: httprouter.New(), cypher: cy, Logger: logx.Default{}}
+func newBase(cy core.Cipher) base {
+	return base{router: httprouter.New(), cipher: cy, Logger: logx.Default{}}
 }
 
 // sub makes the base of a sub multiplexer. Middlewares added to it later are not
@@ -50,7 +50,7 @@ func (b *base) createContext(w http.ResponseWriter, req *http.Request, params ht
 		ctx:       req.Context(),
 		locstore:  b.locStore,
 		validator: valtruc.New(),
-		cypher:    b.cypher,
+		cipher:    b.cipher,
 		Logger:    b.Logger,
 	}
 }
@@ -140,7 +140,7 @@ type Localization struct {
 // AddLocalization sets the translations and the languages of the application.
 // It panics if there are no languages.
 func (b *base) AddLocalization(l Localization) {
-	store := webstore.New(l.Shared, l.Errors, l.Languages, b.cypher)
+	store := webstore.New(l.Shared, l.Errors, l.Languages, b.cipher)
 	b.locStore = &store
 }
 

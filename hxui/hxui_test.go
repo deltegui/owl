@@ -8,8 +8,8 @@ import (
 
 	"github.com/deltegui/hx"
 	"github.com/deltegui/owl/v3"
+	"github.com/deltegui/owl/v3/cipher"
 	"github.com/deltegui/owl/v3/csrf"
-	"github.com/deltegui/owl/v3/cypher"
 	"github.com/deltegui/owl/v3/localizer"
 	"github.com/deltegui/owl/v3/pagination"
 )
@@ -92,7 +92,11 @@ func TestPagination(t *testing.T) {
 }
 
 func TestPageLangIsTheLanguageOfTheRequest(t *testing.T) {
-	mux := owl.New(cypher.NewWithPassword([]byte("0123456789abcdef0123456789abcdef")))
+	c, err := cipher.NewWithKeys([]byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := owl.New(c)
 	mux.AddLocalization(owl.Localization{Shared: shared, Languages: []string{"es", "en"}})
 	mux.Handle(http.MethodGet, "/set", func(ctx owl.Ctx) error { return ctx.ChangeLanguage("en") })
 	mux.Handle(http.MethodGet, "/", func(ctx owl.Ctx) error {

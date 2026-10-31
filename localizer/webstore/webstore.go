@@ -12,12 +12,15 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/deltegui/owl/v3/cipher"
 	"github.com/deltegui/owl/v3/core"
-	"github.com/deltegui/owl/v3/cypher"
 	"github.com/deltegui/owl/v3/localizer"
 )
 
 const cookieKey string = "language"
+
+// cookiePurpose is what the language cookie is sealed for (see cipher.Seal).
+const cookiePurpose = "language"
 
 // Store knows the translations of the whole application and reads the
 // language of a request.
@@ -28,23 +31,23 @@ const cookieKey string = "language"
 //   - languages are the ones the application speaks. The first one is the default:
 //     the language of a request with no valid cookie, and the one that is used when
 //     a source has nothing in the language of the request.
-//   - core.Cypher is used to create and read localization HTTP cookie.
+//   - core.Cipher is used to create and read localization HTTP cookie.
 //
 // shared and errors can be nil.
 type Store struct {
 	shared    localizer.Source
 	errors    localizer.Source
 	languages []string
-	cypher    core.Cypher
+	cipher    core.Cipher
 }
 
 // New creates a Store. It panics if there are no languages: it is a mistake in
 // the configuration of the program, and better found when it starts.
-func New(shared, errors localizer.Source, languages []string, cypher core.Cypher) Store {
+func New(shared, errors localizer.Source, languages []string, c core.Cipher) Store {
 	if len(languages) == 0 {
 		panic("owl: localization needs at least one language")
 	}
-	return Store{shared, errors, slices.Clone(languages), cypher}
+	return Store{shared, errors, slices.Clone(languages), c}
 }
 
 // Default is the first language of the Store.
@@ -81,7 +84,7 @@ func (ws Store) CreateCookie(w http.ResponseWriter, localization string) error {
 	if ws.supported(localization) {
 		lang = localization
 	}
-	encode, err := cypher.EncodeCookie(ws.cypher, lang)
+	encode, err := cipher.Seal(ws.cipher, cookiePurpose, lang)
 	if err != nil {
 		return fmt.Errorf("cannot create language cookie: %w", err)
 	}
@@ -104,7 +107,7 @@ func (ws Store) ReadCookie(req *http.Request) string {
 	if err != nil {
 		return ws.Default()
 	}
-	lang, err := cypher.DecodeCookie(ws.cypher, cookie.Value)
+	lang, err := cipher.Open(ws.cipher, cookiePurpose, cookie.Value, core.OneDayDuration)
 	if err != nil || !ws.supported(lang) {
 		return ws.Default()
 	}

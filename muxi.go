@@ -31,9 +31,9 @@ type Muxi struct {
 	injector *Injector
 }
 
-// Creates a new multiplexer with dependency injection container. Needs a core.Cypher
+// Creates a new multiplexer with dependency injection container. Needs a core.Cipher
 // implementation to automatically do some encryptation like cookies security.
-func NewWithInjector(cy core.Cypher) *Muxi {
+func NewWithInjector(cy core.Cipher) *Muxi {
 	return &Muxi{base: newBase(cy), injector: NewInjector()}
 }
 

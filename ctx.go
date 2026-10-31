@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/deltegui/owl/v3/cipher"
 	"github.com/deltegui/owl/v3/core"
 	"github.com/deltegui/owl/v3/csrf"
-	"github.com/deltegui/owl/v3/cypher"
 	"github.com/deltegui/owl/v3/localizer"
 	"github.com/deltegui/owl/v3/localizer/webstore"
 	"github.com/deltegui/owl/v3/logx"
@@ -42,7 +42,7 @@ type Ctx struct {
 	ModelState core.ModelState
 	validator  valtruc.Valtruc
 	locstore   *webstore.Store
-	cypher     core.Cypher
+	cipher     core.Cipher
 
 	Logger logx.Logger
 }
@@ -279,21 +279,16 @@ func (ctx Ctx) CsrfToken() string {
 	return token
 }
 
-// HaveSession tells if a session is created for this http request.
+// HaveSession tells if there is a logged user in this request (the session
+// middleware left it in the context).
 func (ctx Ctx) HaveSession() bool {
-	instance := ctx.Get(session.ContextKey)
-	if instance == nil {
-		return false
-	}
-	if _, ok := instance.(session.User); !ok {
-		return false
-	}
-	return true
+	_, ok := ctx.User()
+	return ok
 }
 
-// GetUser get current logged user.
-func (ctx Ctx) GetUser() session.User {
-	return ctx.Get(session.ContextKey).(session.User)
+// User is the logged user, and false if there is none.
+func (ctx Ctx) User() (session.User, bool) {
+	return session.FromContext(ctx.ctx)
 }
 
 // GetCurrentLanguage get current cookie defined language.
@@ -330,13 +325,17 @@ type CookieOptions struct {
 	Secure bool
 }
 
+// cookiePurpose ties what a cookie holds to its name: a value sealed for one cookie
+// does not open as another.
+func cookiePurpose(name string) string { return "cookie:" + name }
+
 // Creates a cookie with provided options.
 func (ctx *Ctx) CreateCookieOptions(opt CookieOptions) error {
 	var data string
 	var err error
-	data, err = cypher.EncodeCookie(ctx.cypher, opt.Value)
+	data, err = cipher.Seal(ctx.cipher, cookiePurpose(opt.Name), opt.Value)
 	if err != nil {
-		return fmt.Errorf("error encoding cookie: %w", err)
+		return fmt.Errorf("error sealing cookie: %w", err)
 	}
 
 	http.SetCookie(ctx.Res, &http.Cookie{
@@ -371,9 +370,9 @@ func (ctx *Ctx) ReadCookie(name string) (string, error) {
 		return "", fmt.Errorf("error while reading cookie with key: '%s': %w", name, err)
 	}
 	var data string
-	data, err = cypher.DecodeCookie(ctx.cypher, cookie.Value)
+	data, err = cipher.Open(ctx.cipher, cookiePurpose(name), cookie.Value, 0)
 	if err != nil {
-		return "", fmt.Errorf("cannot decode cookie: %w", err)
+		return "", fmt.Errorf("cannot open cookie: %w", err)
 	}
 	return data, nil
 }

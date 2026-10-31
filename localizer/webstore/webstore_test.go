@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/deltegui/owl/v3/cipher"
 	"github.com/deltegui/owl/v3/core"
-	"github.com/deltegui/owl/v3/cypher"
 	"github.com/deltegui/owl/v3/localizer"
 )
 
@@ -70,7 +70,7 @@ func TestNewNeedsALanguage(t *testing.T) {
 }
 
 func TestTheFirstLanguageIsTheDefault(t *testing.T) {
-	store := New(nil, nil, []string{"en", "es"}, cypher.NewWithPassword(password))
+	store := New(nil, nil, []string{"en", "es"}, testCipher(t))
 	if got := store.Default(); got != "en" {
 		t.Errorf("default = %q", got)
 	}
@@ -80,7 +80,7 @@ func TestTheFirstLanguageIsTheDefault(t *testing.T) {
 }
 
 func TestCookieOnlyKeepsSupportedLanguages(t *testing.T) {
-	cy := cypher.NewWithPassword(password)
+	cy := testCipher(t)
 	store := New(nil, nil, []string{"es", "en", "fr"}, cy)
 	if got := store.ReadCookie(requestIn(t, store, "fr")); got != "fr" {
 		t.Errorf("a language of the list is kept, got %q", got)
@@ -102,7 +102,7 @@ func TestCookieOnlyKeepsSupportedLanguages(t *testing.T) {
 }
 
 func TestASourceWithoutTheLanguageIsReadInTheDefaultOne(t *testing.T) {
-	cy := cypher.NewWithPassword(password)
+	cy := testCipher(t)
 	spanishFirst := New(nil, nil, []string{"es", "en", "fr"}, cy)
 	if got := spanishFirst.Texts(view, requestIn(t, spanishFirst, "fr")).Get("Hello"); got != "Hola" {
 		t.Errorf("view has no French: want the Spanish, got %q", got)
@@ -118,7 +118,7 @@ func TestASourceWithoutTheLanguageIsReadInTheDefaultOne(t *testing.T) {
 }
 
 func TestErrorsAreTranslatedWithTheFallback(t *testing.T) {
-	cy := cypher.NewWithPassword(password)
+	cy := testCipher(t)
 	errs := localizer.Dict{"es": {"7": "Fallo"}, "en": {"7": "Failure"}}
 	store := New(nil, errs, []string{"es", "en", "fr"}, cy)
 	boom := core.DomainError{Code: 7, Message: "boom"}
@@ -131,4 +131,13 @@ func TestErrorsAreTranslatedWithTheFallback(t *testing.T) {
 	if got := store.GetLocalizedError(core.DomainError{Code: 8, Message: "other"}, request()); got != "other" {
 		t.Errorf("a code with no translation keeps its message, got %q", got)
 	}
+}
+
+func testCipher(t *testing.T) *cipher.AES256 {
+	t.Helper()
+	c, err := cipher.NewWithKeys(password)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
 }

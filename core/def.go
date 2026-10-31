@@ -20,17 +20,29 @@ const (
 
 const OneDayDuration time.Duration = 24 * time.Hour
 
-// Hasher is anything that implements a hash algorithm.
-// Normally a cryptographic hash to hash passwords (eg Bcrypt)
+// Hasher hashes and checks passwords. The result of Hash holds everything Check
+// needs (algorithm, parameters and salt), so a hash made with other parameters
+// still checks, and NeedsRehash tells when it is time to make it again.
 type Hasher interface {
-	Hash(value string) (string, error)
-	Check(a, b string) bool
+	// Hash returns the hash of a password, with a new random salt every time.
+	Hash(password string) (string, error)
+	// Check tells if password is the one that made encoded. A wrong password is
+	// (false, nil); an error means that encoded is not a hash this Hasher can read.
+	Check(encoded, password string) (bool, error)
+	// NeedsRehash tells if encoded was made with other parameters than the ones
+	// of this Hasher (or cannot be read). After a good login, hash the password again.
+	NeedsRehash(encoded string) bool
+	// Mimic spends the time of a Check, for when there is no hash to check (the
+	// user does not exist) and the answer must not be quicker than for one that does.
+	Mimic(password string)
 }
 
-// Cypher is anything that implements a symmetric encription
-type Cypher interface {
-	Encrypt(data []byte) ([]byte, error)
-	Decrypt(data []byte) ([]byte, error)
+// Cipher is anything that implements an authenticated symmetric encryption.
+// aad is additional data that is authenticated but not stored: Decrypt only
+// opens what Encrypt sealed with the same one.
+type Cipher interface {
+	Encrypt(data, aad []byte) ([]byte, error)
+	Decrypt(data, aad []byte) ([]byte, error)
 }
 
 // Role defines a user role

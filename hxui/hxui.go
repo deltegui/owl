@@ -73,7 +73,7 @@ func (v View) LocalizeError(err core.DomainError) string { return v.Ctx.Localize
 
 // CsrfInput is the hidden input with the CSRF token of the request.
 func (v View) CsrfInput() hx.INode {
-	return hx.Input().Type("hidden").Attribute("name", csrf.CsrfHeaderName).Value(v.Ctx.CsrfToken())
+	return hx.Input().Type("hidden").Attribute("name", csrf.FieldName).Value(v.Ctx.CsrfToken())
 }
 
 // errorsOf is the validation errors of a field, or nothing if it is valid.
