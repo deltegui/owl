@@ -1,7 +1,6 @@
 package hxui
 
 import (
-	"embed"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,11 +9,20 @@ import (
 	"github.com/deltegui/hx"
 	"github.com/deltegui/owl/v3"
 	"github.com/deltegui/owl/v3/csrf"
+	"github.com/deltegui/owl/v3/cypher"
+	"github.com/deltegui/owl/v3/localizer"
 	"github.com/deltegui/owl/v3/pagination"
 )
 
-//go:embed testdata/*.json common/*.json
-var files embed.FS
+var view = localizer.Dict{
+	"es": {"Name": "Nombre", "Hello": "Hola %s", "kind.one": "Uno"},
+	"en": {"Name": "Name"},
+}
+
+var shared = localizer.Dict{
+	"es": {"shared.choose": "Elige"},
+	"en": {"shared.choose": "Choose"},
+}
 
 type form struct {
 	Name string `valtruc:"required"`
@@ -23,7 +31,7 @@ type form struct {
 func serve(t *testing.T, target string, view func(ctx owl.Ctx) hx.INode) string {
 	t.Helper()
 	mux := owl.New(nil)
-	mux.AddLocalization(files, "testdata/shared", "testdata/errors")
+	mux.AddLocalization(owl.Localization{Shared: shared, Languages: []string{"es", "en"}})
 	mux.Handle(http.MethodGet, "/list", func(ctx owl.Ctx) error {
 		ctx.Set(csrf.ContextKey, `tok"<en`)
 		return ctx.View(owl.HixView(view))
@@ -36,14 +44,14 @@ func serve(t *testing.T, target string, view func(ctx owl.Ctx) hx.INode) string 
 func TestPageCsrfAndErrors(t *testing.T) {
 	body := serve(t, "/list", func(ctx owl.Ctx) hx.INode {
 		ctx.Validate(form{})
-		v := NewView(ctx, "testdata/view")
-		return Page("T <1>", []hx.INode{Stylesheet("/a.css")},
+		v := NewView(ctx, view)
+		return Page(ctx, "T <1>", []hx.INode{Stylesheet("/a.css")},
 			hx.Form().Body(v.CsrfInput(), v.FormErrors("Name"), v.FormErrors("Other"),
 				hx.P().Text(v.T("Hello", "<Ana>"))),
 		)
 	})
 	for _, want := range []string{
-		"<!doctype html><html", `<title>T &lt;1&gt;</title>`, `href="/a.css"`,
+		"<!doctype html><html lang=\"es\"", `<title>T &lt;1&gt;</title>`, `href="/a.css"`,
 		`name="X-Csrf-Token"`, `value="tok&#34;&lt;en"`, `form-error`,
 		"Hola &lt;Ana&gt;", "Nombre",
 	} {
@@ -58,7 +66,7 @@ func TestPageCsrfAndErrors(t *testing.T) {
 
 func TestSelectIsTranslated(t *testing.T) {
 	body := serve(t, "/list", func(ctx owl.Ctx) hx.INode {
-		return NewView(ctx, "testdata/view").Select(owl.SelectList{Name: "kind", Items: []owl.SelectItem{
+		return NewView(ctx, view).Select(owl.SelectList{Name: "kind", Items: []owl.SelectItem{
 			{Value: "", Tag: "shared.choose"}, {Value: "1", Tag: "kind.one", Selected: true},
 		}})
 	})
@@ -80,5 +88,37 @@ func TestPagination(t *testing.T) {
 	one := pagination.Pagination{CurrentPage: 1, ElementsPerPage: 10, TotalElements: 5}
 	if got := serve(t, "/list", func(ctx owl.Ctx) hx.INode { return Pagination(ctx, one, nil) }); got != "" {
 		t.Errorf("one page should write nothing: %q", got)
+	}
+}
+
+func TestPageLangIsTheLanguageOfTheRequest(t *testing.T) {
+	mux := owl.New(cypher.NewWithPassword([]byte("0123456789abcdef0123456789abcdef")))
+	mux.AddLocalization(owl.Localization{Shared: shared, Languages: []string{"es", "en"}})
+	mux.Handle(http.MethodGet, "/set", func(ctx owl.Ctx) error { return ctx.ChangeLanguage("en") })
+	mux.Handle(http.MethodGet, "/", func(ctx owl.Ctx) error {
+		return ctx.View(owl.HixView(func(ctx owl.Ctx) hx.INode { return Page(ctx, "T", nil) }))
+	})
+	set := httptest.NewRecorder()
+	mux.ServeHTTP(set, httptest.NewRequest(http.MethodGet, "/set", nil))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	for _, c := range set.Result().Cookies() {
+		req.AddCookie(c)
+	}
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if body := rec.Body.String(); !strings.Contains(body, `<html lang="en"`) {
+		t.Errorf("want lang=en after choosing English, got %s", body)
+	}
+}
+
+func TestPageHasNoLangWithoutLocalization(t *testing.T) {
+	mux := owl.New(nil)
+	mux.Handle(http.MethodGet, "/", func(ctx owl.Ctx) error {
+		return ctx.View(owl.HixView(func(ctx owl.Ctx) hx.INode { return Page(ctx, "T", nil) }))
+	})
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if body := rec.Body.String(); strings.Contains(body, "lang=") || !strings.Contains(body, "<html>") {
+		t.Errorf("no localization, no lang attribute: %s", body)
 	}
 }

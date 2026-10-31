@@ -19,109 +19,84 @@ All features are tightly integrated with each other and implemented with a minim
 
 ## Example
 
-Here’s an example that demonstrates what the framework can do:
+Here’s an example that demonstrates what the framework can do. Views are written with [Hix](https://github.com/deltegui/hx), so a page is plain Go code:
 
 ```go
 // Define a struct for our login form.
 type loginForm struct {
-	Name               string `valtruc:"min=3, max=255, required"`  // Use valtruc to define rules for validation
-	Password           string `valtruc:"min=3, max=255, required"`
-	LangSelectList     owl.SelectList                               // A select list
+	Name     string `valtruc:"min=3, max=255, required"` // Use valtruc to define rules for validation
+	Password string `valtruc:"min=3, max=255, required"`
+}
+
+// The view: a function that builds the page with Hix.
+// The translations of the view, in code, next to it.
+var loginTexts = localizer.Dict{
+	"es": {"Name": "Nombre", "Password": "Contraseña", "Login": "Inicia sesión"},
+	"en": {"Name": "Name", "Password": "Password", "Login": "Login"},
+}
+
+func loginView(form loginForm) owl.HixView {
+	return func(ctx owl.Ctx) hx.INode {
+		v := hxui.NewView(ctx, loginTexts) // The translations in the language of the request
+		return hxui.Page(ctx, v.T("Login"), nil,
+			hx.Form().Attribute("action", "/account/login").Attribute("method", "post").Body(
+				v.CsrfInput(), // Hidden input with the CSRF token.
+				hx.Label().Text(v.T("Name")), // Looks the key up in loginTexts
+				hx.Input().Type("text").Attribute("name", "Name").Value(form.Name),
+				v.FormErrors("Name"), // Validation errors for the field named "Name"
+				hx.Label().Text(v.T("Password")),
+				hx.Input().Type("password").Attribute("name", "Password"),
+				v.FormErrors("Password"),
+				hx.Button().Type("submit").Text(v.T("Login")),
+			),
+		)
+	}
 }
 
 func handleProcessLogin(service accountService, sessionManager *session.Manager) owl.Handler {
-	templ := template.Must(...) // Parse your views using plain Go template.
 	return func(ctx owl.Ctx) error {
-        var form loginForm
-		ctx.ParseForm(&form) // Reads form serializes as  and fill loginForm struct
-		ctx.Validate(form) // Validate the struct now its filled.
+		var form loginForm
+		ctx.ParseForm(&form) // Reads the form and fills loginForm
+		ctx.Validate(form)   // Validate the struct now its filled.
 
 		if !ctx.ModelState.Valid { // ModelState will tell you if the loginForm is valid or not.
 			form.Password = ""
-            ctx.Status(http.BadRequest)
-		    return ctx.Render(templ, views.AccountLogin, form) // Render the view
+			ctx.Status(http.StatusBadRequest)
+			return ctx.View(loginView(form)) // Render the view
 		}
 
-		dto := accountDto{
-			Name:     form.Name,
-			Password: form.Password,
-		}
-
-		account, _ = service.login(dto) // Call your service
+		account, _ := service.login(accountDto{Name: form.Name, Password: form.Password}) // Call your service
 
 		sessionManager.CreateSessionCookie(ctx.Res, session.User{
-			Id:    account.IdUser,
-			Name:  account.Name,
+			Id:   account.IdUser,
+			Name: account.Name,
 		})
 		_ = ctx.ChangeLanguage(account.ProfileLang)
 
 		return ctx.Redirect("/panel")
-    }
+	}
 }
 
 func main() {
-    cy := cypher.New()
+	cy := cypher.New()
 
-    r := owl.NewWithInjector() // Create a new router with a dependency injection container. If you dont like / need a dependency injection container you can just use owl.New().
-    r.StaticEmbedded(static.Files) // Create a mountpoint for static files.
-	r.AddLocalization(locale.Files, locale.Shared, locale.Errors) // Adds loclaization. You can then use Localize(key) in your views.
+	r := owl.NewWithInjector() // Create a new router with a dependency injection container. If you dont like / need a dependency injection container you can just use owl.New().
+	r.StaticEmbedded(static.Files) // Create a mountpoint for static files.
+	r.AddLocalization(owl.Localization{Shared: locale.Shared, Errors: locale.Errors, Languages: []string{"es", "en"}}) // The translations of the whole app (localizer.Dict) and the languages it speaks. The first one is the default.
 
-    r.Add(newAccountService()) // Register your account service
-    r.Add(func() *session.Manager {
-        return session.NewInMemoryManager()
-    }) // Register a session manager with in-memory persistence.
+	r.Add(newAccountService()) // Register your account service
+	r.Add(func() *session.Manager {
+		return session.NewInMemoryManager()
+	}) // Register a session manager with in-memory persistence.
 
-    sub := r.CreateSubMux("/account") // Creates a subrouter mounted in the URL /account
-    sub.Post("/login", handleProcessLogin) // Automatically will wire your dependencies.
+	sub := r.CreateSubMux("/account") // Creates a subrouter mounted in the URL /account
+	sub.Post("/login", handleProcessLogin) // Automatically will wire your dependencies.
 
-	ctx.Mux.Listen(conf.ListenURL) // Start the server.
+	r.Listen(":8080") // Start the server.
 }
 ```
 
-Your view.html content:
-
-```html
-<html>
-<body>
-
-{{ template "select_list" (SelectList .Localizer .Model.LangSelectList) }}
-
-<form action="/account/login" method="post">
-    {{ .PlaceCsrfInput }} <!-- Create a hidden input with CSRF token. -->
-    <div class="mb-3">
-        <label for="input-name">{{ .Localize "Name" }}</label> <!-- This will search in view.html.json a localized string -->
-        <input id="input-name" type="text" name="Name" value="{{ .Model.Name }}" /> <!-- Access to your model using .Model -->
-        {{ PlaceErrorList . "Name" }} <!-- Place a list with validation errors for the struct field named "Name" -->
-    </div>
-    <div class="mb-3">
-        <label for="input-password">{{ .Localize "Password" }}</label>
-        <input id="input-password" type="password" name="Password" />
-        {{ PlaceErrorList . "Password" }}
-    </div>
-
-    <button type="submit">
-        {{ .Localize "Login" }}
-    </button>
-
-</form>
-```
-
-Store your localized strings for your view in view.html.json:
-
-```json
-{
-    "es": {
-        "Name": "Nombre",
-        "Password": "Contraseña",
-        "Login": "Inicia sesión"
-    },
-    "en": {
-        "Name": "Name",
-        "Password": "Password",
-        "Login": "Login"
-    }
-}
-```
+A `localizer.Dict` is checked at compile time for repeated keys, and `localizer.Check(loginTexts)` in a test tells which keys a language is missing.
 
 # How to install
 

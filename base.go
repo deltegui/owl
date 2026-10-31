@@ -8,6 +8,7 @@ import (
 
 	"github.com/deltegui/owl/v3/core"
 	"github.com/deltegui/owl/v3/localizer"
+	"github.com/deltegui/owl/v3/localizer/webstore"
 	"github.com/deltegui/owl/v3/logx"
 	"github.com/deltegui/valtruc"
 	"github.com/julienschmidt/httprouter"
@@ -19,8 +20,7 @@ import (
 type base struct {
 	router   *httprouter.Router
 	cypher   core.Cypher
-	locStore *localizer.WebStore
-	renderer Renderer
+	locStore *webstore.Store
 
 	middlewares []Middleware
 	routePrefix string
@@ -49,7 +49,6 @@ func (b *base) createContext(w http.ResponseWriter, req *http.Request, params ht
 		params:    params,
 		ctx:       req.Context(),
 		locstore:  b.locStore,
-		renderer:  b.renderer,
 		validator: valtruc.New(),
 		cypher:    b.cypher,
 		Logger:    b.Logger,
@@ -123,9 +122,25 @@ func (b *base) Listen(address string) {
 	waitAndStopServer(&server)
 }
 
-// AddLocalization creates a new WebLocalizerStore using the provided parameters.
-func (b *base) AddLocalization(fs embed.FS, sharedKey, errorKey string) {
-	store := localizer.NewWebLocalizerStore(fs, sharedKey, errorKey, b.cypher)
+// Localization is the translations of the whole application.
+//
+//   - Shared are the ones every component can use.
+//   - Errors translates the codes of a core.DomainError.
+//   - Languages are the ones the application speaks, at least one. The first is
+//     the default: the language of someone with no language cookie.
+//
+// Shared and Errors can be nil. The translations of a component are a
+// localizer.Dict next to its code, see Ctx.Texts.
+type Localization struct {
+	Shared    localizer.Source
+	Errors    localizer.Source
+	Languages []string
+}
+
+// AddLocalization sets the translations and the languages of the application.
+// It panics if there are no languages.
+func (b *base) AddLocalization(l Localization) {
+	store := webstore.New(l.Shared, l.Errors, l.Languages, b.cypher)
 	b.locStore = &store
 }
 
@@ -133,10 +148,6 @@ func (b *base) AddLocalization(fs embed.FS, sharedKey, errorKey string) {
 func (b *base) Use(middleware Middleware) {
 	b.middlewares = append(b.middlewares, middleware)
 }
-
-// SetRenderer changes how ctx.View renders for this multiplexer and the ones
-// created from it afterwards. The default is HixRenderer.
-func (b *base) SetRenderer(r Renderer) { b.renderer = r }
 
 // ServeHTTP makes the multiplexer an http.Handler, so it can be used with
 // httptest or a server of your own.

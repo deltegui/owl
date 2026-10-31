@@ -8,6 +8,23 @@ import (
 	"github.com/deltegui/owl/v3/localizer"
 )
 
+// Texts is the words of the pagination bar, in Spanish and English. Change it at
+// the start of the program to say something else, or to add the languages of the
+// application: a language it does not have is shown with the default one, and if
+// that is missing too the bar shows its keys.
+var Texts = localizer.Dict{
+	localizer.LangSpanish: {
+		"PaginationNextButton":        "Siguiente",
+		"PaginationPreviousButton":    "Anterior",
+		"PaginationMessageOfElements": "%d a %d de %d",
+	},
+	localizer.LangEnglish: {
+		"PaginationNextButton":        "Next",
+		"PaginationPreviousButton":    "Previous",
+		"PaginationMessageOfElements": "%d to %d of %d",
+	},
+}
+
 type ViewModel struct {
 	StartElement       int
 	LastElement        int
@@ -78,6 +95,6 @@ func ToVM(ctx owl.Ctx, p Pagination) ViewModel {
 		NextPage:           p.CurrentPage + 1,
 		Order:              int(p.Order),
 		OrderBy:            p.OrderBy,
-		loc:                ctx.GetLocalizer("common/pagination"),
+		loc:                ctx.Texts(Texts),
 	}
 }

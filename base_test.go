@@ -100,7 +100,8 @@ func TestLanguageWithoutLocalizationDoesNotPanic(t *testing.T) {
 		return nil
 	})
 	do(mux, "GET", "/lang")
-	if lang != "es" || !errors.Is(err, ErrNoLocalization) {
+	// With no localization there is no language to speak of: it is empty, and it does not panic.
+	if lang != "" || !errors.Is(err, ErrNoLocalization) {
 		t.Errorf("lang = %q, err = %v", lang, err)
 	}
 }

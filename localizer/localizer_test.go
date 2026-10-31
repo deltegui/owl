@@ -1,46 +1,69 @@
 package localizer
 
 import (
-	"embed"
+	"slices"
 	"testing"
 )
 
-//go:embed testdata/*.json
-var files embed.FS
-
-func TestMissingOrBrokenFilesDoNotPanic(t *testing.T) {
-	store := NewLocalizerStore(files)
-	for _, key := range []string{"testdata/nothing", "testdata/broken", "testdata/onlyen"} {
-		loc := store.Get(key, "es")
-		if loc == nil || loc.Get("Hello") != "Hello" {
-			t.Errorf("%s: want an empty localizer that shows the key, got %v", key, loc)
-		}
-	}
+var view = Dict{
+	"es": {"Hello": "Hola", "Shared": "Mío"},
+	"en": {"Hello": "Hi"},
 }
 
-func TestGetUsesTheLanguageAndFallsBack(t *testing.T) {
-	store := NewLocalizerStore(files)
-	if got := store.Get("testdata/view", "en").Get("Hello"); got != "Hello" {
+func TestDictGetIsExact(t *testing.T) {
+	if got := view.Get("en").Get("Hello"); got != "Hi" {
 		t.Errorf("en = %q", got)
 	}
-	if got := store.Get("testdata/view", "fr").Get("Hello"); got != "Hola" {
-		t.Errorf("an unknown language falls back to Spanish, got %q", got)
+	// A language the Dict does not have is empty: the fallback is not its business.
+	if got := view.Get("fr"); got == nil || got.Get("Hello") != "Hello" {
+		t.Errorf("want an empty localizer that shows the key, got %v", got)
+	}
+	if got := Dict(nil).Get("es"); got == nil || got.Get("Hello") != "Hello" {
+		t.Errorf("nil dict: %v", got)
 	}
 }
 
-func TestWebStoreMergesSharedAndSurvivesAMissingFile(t *testing.T) {
-	web := NewWebLocalizerStore(files, "testdata/shared", "testdata/errors", nil)
-	loc := web.Get("testdata/view", "es")
-	if loc.Get("Hello") != "Hola" || loc.Get("Shared") != "Compartido" {
-		t.Errorf("merged = %v", loc)
+func TestPickFallsBackByLanguage(t *testing.T) {
+	if got := Pick(view, "en", "es").Get("Hello"); got != "Hi" {
+		t.Errorf("a language it has = %q", got)
 	}
-	// The view file is missing: the shared translations are still there, and it does not panic.
-	if got := web.Get("testdata/nothing", "es"); got.Get("Shared") != "Compartido" {
-		t.Errorf("missing view = %v", got)
+	if got := Pick(view, "fr", "es").Get("Hello"); got != "Hola" {
+		t.Errorf("a language it does not have falls back, got %q", got)
 	}
-	// So is the shared one.
-	broken := NewWebLocalizerStore(files, "testdata/gone", "testdata/errors", nil)
-	if got := broken.Get("testdata/view", "es"); got.Get("Hello") != "Hola" {
-		t.Errorf("missing shared = %v", got)
+	// A language with nothing in it falls back too.
+	empty := Dict{"es": {"Hello": "Hola"}, "en": {}}
+	if got := Pick(empty, "en", "es").Get("Hello"); got != "Hola" {
+		t.Errorf("an empty language falls back, got %q", got)
+	}
+	// It is by language, not by key: a key that the language lacks is not taken from the fallback.
+	if got := Pick(view, "en", "es").Get("Shared"); got != "Shared" {
+		t.Errorf("a missing key shows as itself, got %q", got)
+	}
+	// Neither language: empty, and a nil source is empty.
+	if got := Pick(Dict{"it": {"A": "a"}}, "fr", "es"); got == nil || got.Get("A") != "A" {
+		t.Errorf("neither = %v", got)
+	}
+	if got := Pick(nil, "es", "es"); got == nil || got.Get("A") != "A" {
+		t.Errorf("nil source = %v", got)
+	}
+}
+
+func TestCheck(t *testing.T) {
+	if problems := Check(Dict{"es": {"A": "a"}, "en": {"A": "a"}}, "es", "en"); len(problems) != 0 {
+		t.Errorf("complete dict: %v", problems)
+	}
+	got := Check(Dict{"es": {"A": "a", "B": "b"}, "en": {"A": "a", "C": "c"}})
+	want := []string{`'en' has no key "B"`, `'es' has no key "C"`}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	// A language of the application that the Dict does not have at all.
+	got = Check(Dict{"es": {"A": "a"}, "en": {"A": "a"}}, "es", "en", "fr")
+	if want := []string{"there is no language 'fr'"}; !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	// Without the list of languages, only the keys are compared.
+	if got := Check(Dict{"en": {"A": "a"}}); len(got) != 0 {
+		t.Errorf("a single language has nothing to compare: %v", got)
 	}
 }

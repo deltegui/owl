@@ -5,15 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/deltegui/owl/v3/core"
+	"github.com/deltegui/owl/v3/csrf"
 	"github.com/deltegui/owl/v3/cypher"
 	"github.com/deltegui/owl/v3/localizer"
+	"github.com/deltegui/owl/v3/localizer/webstore"
 	"github.com/deltegui/owl/v3/logx"
 	"github.com/deltegui/owl/v3/session"
 	"github.com/deltegui/valtruc"
@@ -40,8 +41,7 @@ type Ctx struct {
 
 	ModelState core.ModelState
 	validator  valtruc.Valtruc
-	locstore   *localizer.WebStore
-	renderer   Renderer
+	locstore   *webstore.Store
 	cypher     core.Cypher
 
 	Logger logx.Logger
@@ -257,104 +257,31 @@ func (ctx Ctx) ParseJson(dst any) error {
 	return json.NewDecoder(ctx.Req.Body).Decode(dst)
 }
 
-// Render writes to http response a rendered template. You must pass the following arguments:
-//
-// - templ: Templates parsed needed to render the view.
-// - name: Name of the view you want to render and is parsed in templ
-// - m: A model you pass to the view.
-//
-// Example of use:
-//
-//	func indexHandler(service demoService) owl.Handler {
-//		templ := views.Parse("DemoLayout.html", "DemoMainView.html")
-//		return func(ctx owl.Ctx) error {
-//			return ctx.Render(templ, "DemoMainView", viewModel{
-//				Name: "Manolito",
-//			})
-//		}
-//	}
-//
-// If you define a DemoLayout.html like this:
-//
-//	<html>
-//	<head>
-//		<title>¡Hello!</title>
-//	</head>
-//	<body>
-//		{{ block "Content" }}
-//			<!-- Content -->
-//		{{ end }}
-//	</body>
-//
-// </html>
-//
-// And you fill other file named DemoMainView.html this way:
-//
-//	{{ define "Content" }}
-//		<h1>Hello {{ .Model.Name }}</h1>
-//	{{ end }}
-//
-// The above code will render this html:
-//
-//	<html>
-//	<head>
-//		<title>¡Hello!</title>
-//	</head>
-//	<body>
-//		<h1>Hello Manolito</h1>
-//	</body>
-//	</html>
-//
-// For more information how ViewModels works see ViewModel struct type.
-func (ctx Ctx) Render(templ *template.Template, name string, m any) error {
-	return templ.Execute(ctx.Res, createViewModel(ctx, name, m))
-}
-
-/*
-func (ctx Ctx) Render(templ *template.Template, m any) error {
-	definedTemplates := templ.DefinedTemplates()
-	lastIndex := len(definedTemplates) - 1
-	if lastIndex < 0 {
-		panic("Call to render with a template.Template with no parsed templates!")
-	}
-	ctx.RenderLocalized(templ, definedTemplates[lastIndex], m)
-}
-*/
-
-// GetLocalizer creates a Localizer from Json file with the language defined
-// in http cookie.
-func (ctx Ctx) GetLocalizer(file string) localizer.Localizer {
+// Texts is the Localizer of a component in the language defined in http cookie,
+// with the shared translations (see AddLocalization) added; it is a new map.
+// A source with nothing in that language is read in the default one. Without
+// localization it is empty, so every key shows as itself.
+func (ctx Ctx) Texts(src localizer.Source) localizer.Localizer {
 	if ctx.locstore == nil {
 		return localizer.Localizer{}
 	}
-	return ctx.locstore.GetUsingRequest(file, ctx.Req)
+	return ctx.locstore.Texts(src, ctx.Req)
 }
 
-// Localizes a key using the Json file you provided with the language defined
-// in http cookie.
-func (ctx Ctx) Localize(file, key string) string {
-	if ctx.locstore == nil {
-		return key
-	}
-	return ctx.locstore.GetUsingRequest(file, ctx.Req).Get(key)
-}
-
-// Localizes a key using the Json file you provided with the language defined
-// in http cookie. Ignores Shared translations.
-func (ctx Ctx) LocalizeWithoutShared(file, key string) string {
-	if ctx.locstore == nil {
-		return key
-	}
-	return ctx.locstore.GetUsingRequestWithoutShared(file, ctx.Req).Get(key)
-}
-
-// Localizes a DomainError using the error Json file with the language defined
-// in http cookie.
+// Localizes a DomainError using the errors translations with the language
+// defined in http cookie.
 func (ctx Ctx) LocalizeError(err core.DomainError) string {
 	if ctx.locstore == nil {
 		return err.Message
 	}
 	return ctx.locstore.GetLocalizedError(err, ctx.Req)
+}
+
+// CsrfToken is the CSRF token of the request, or an empty string if the CSRF
+// middleware is not used.
+func (ctx Ctx) CsrfToken() string {
+	token, _ := ctx.Get(csrf.ContextKey).(string)
+	return token
 }
 
 // HaveSession tells if a session is created for this http request.
@@ -375,10 +302,11 @@ func (ctx Ctx) GetUser() session.User {
 }
 
 // GetCurrentLanguage get current cookie defined language.
-// Without localization (see AddLocalization) it is the default language.
+// It is always one of the languages of AddLocalization, the first one if the
+// request has no valid cookie. Without localization it is an empty string.
 func (ctx *Ctx) GetCurrentLanguage() string {
 	if ctx.locstore == nil {
-		return localizer.DefaultLanguage
+		return ""
 	}
 	return ctx.locstore.ReadCookie(ctx.Req)
 }

@@ -14,18 +14,25 @@ import (
 	"github.com/deltegui/owl/v3"
 	"github.com/deltegui/owl/v3/core"
 	"github.com/deltegui/owl/v3/csrf"
+	"github.com/deltegui/owl/v3/localizer"
 	"github.com/deltegui/owl/v3/pagination"
 )
 
-// Page is the document of a page: doctype (written by HixRenderer), charset,
-// viewport and title in the head, and the body.
-func Page(title string, head []hx.INode, body ...hx.INode) hx.INode {
+// Page is the document of a page: doctype (written by ctx.View), charset,
+// viewport and title in the head, and the body. The lang of the document is the
+// language of the request (the cookie, see ctx.GetCurrentLanguage), or none if
+// there is no localization.
+func Page(ctx owl.Ctx, title string, head []hx.INode, body ...hx.INode) hx.INode {
 	meta := []hx.INode{
 		hx.El("meta").Attribute("charset", "utf-8"),
 		hx.El("meta").Attribute("name", "viewport").Attribute("content", "width=device-width, initial-scale=1"),
 		hx.El("title").Text(title),
 	}
-	return hx.El("html").Attribute("lang", "en").Body(
+	html := hx.El("html")
+	if lang := ctx.GetCurrentLanguage(); lang != "" {
+		html.Attribute("lang", lang)
+	}
+	return html.Body(
 		hx.El("head").Body(append(meta, head...)...),
 		hx.El("body").Body(body...),
 	)
@@ -41,52 +48,64 @@ func Script(src string) hx.INode {
 	return hx.El("script").Src(src).Attribute("defer", "")
 }
 
-// View is what a template gets as its dot, for a view made with Hix: the model
-// state, the CSRF token and the translations of the view's file (the name you
-// would give ctx.Render, for example "usr_tag/usr_tag_index.html", plus the shared
-// file of AddLocalization). Make one at the start of the HixView.
+// View is what a view made with Hix works with: the translations of a component
+// (a localizer.Source, usually a Dict, plus the shared ones of AddLocalization), and through Ctx
+// the model state and the CSRF token. Make one at the start of the HixView.
 //
 //	func(ctx owl.Ctx) hx.INode {
-//		v := hxui.NewView(ctx, "usr_tag/usr_tag_edit.html")
+//		v := hxui.NewView(ctx, texts)
 //		return hx.Label().Text(v.T("Name"))...
 type View struct {
 	Ctx owl.Ctx
-	vm  owl.ViewModel
+	loc localizer.Localizer
 }
 
-// NewView loads the translations of the file for the language of the request.
-func NewView(ctx owl.Ctx, file string) View {
-	return View{Ctx: ctx, vm: ctx.ViewModel(file, nil)}
+// NewView gets the translations of the component for the language of the request.
+func NewView(ctx owl.Ctx, texts localizer.Source) View {
+	return View{Ctx: ctx, loc: ctx.Texts(texts)}
 }
 
-// T is Localize in templates: the key translated, with fmt arguments.
-func (v View) T(key string, args ...any) string { return v.vm.Localize(key, args...) }
+// T is the key translated, with fmt arguments.
+func (v View) T(key string, args ...any) string { return v.loc.GetFormatted(key, args...) }
 
 // LocalizeError translates a DomainError with the errors file.
-func (v View) LocalizeError(err core.DomainError) string { return v.vm.LocalizeError(err) }
+func (v View) LocalizeError(err core.DomainError) string { return v.Ctx.LocalizeError(err) }
 
-// CsrfInput is the hidden input with the CSRF token of the request, the same
-// that PlaceCsrfInput writes in templates.
+// CsrfInput is the hidden input with the CSRF token of the request.
 func (v View) CsrfInput() hx.INode {
-	return hx.Input().Type("hidden").Attribute("name", csrf.CsrfHeaderName).Value(v.vm.CsrfToken)
+	return hx.Input().Type("hidden").Attribute("name", csrf.CsrfHeaderName).Value(v.Ctx.CsrfToken())
+}
+
+// errorsOf is the validation errors of a field, or nothing if it is valid.
+func (v View) errorsOf(field string) []core.ValidationError {
+	if v.Ctx.ModelState.Valid {
+		return nil
+	}
+	return v.Ctx.ModelState.Errors[field]
 }
 
 // HaveFormError tells if the validation of the field failed (see ctx.Validate).
-func (v View) HaveFormError(field string) bool { return v.vm.HaveFormError(field) }
+func (v View) HaveFormError(field string) bool { return len(v.errorsOf(field)) > 0 }
 
 // FormError is the first error of the field, translated, or an empty string.
-func (v View) FormError(field string) string { return v.vm.GetFormError(field) }
+func (v View) FormError(field string) string {
+	errs := v.errorsOf(field)
+	if len(errs) == 0 {
+		return ""
+	}
+	return owl.FormatError(v.loc, errs[0])
+}
 
 // FormErrors is the list of errors of a field, translated, or nothing if the
-// field is valid. Each item has the class form-error (PlaceErrorList).
+// field is valid. Each item has the class form-error.
 func (v View) FormErrors(field string) hx.INode {
-	errs := v.vm.GetAllFormErrors(field)
+	errs := v.errorsOf(field)
 	if len(errs) == 0 {
 		return hx.Noop()
 	}
 	items := make([]hx.INode, len(errs))
 	for i, err := range errs {
-		items[i] = hx.Li().Class("form-error").Text(err)
+		items[i] = hx.Li().Class("form-error").Text(owl.FormatError(v.loc, err))
 	}
 	return hx.Span().Body(hx.Ul().Body(items...))
 }
