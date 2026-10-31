@@ -1,19 +1,23 @@
+// Package hxmail renders emails with Hix: for each kind of payload it registers
+// a view (written with Hix and rendered with hx/ssr) and its texts (a
+// localizer.Dict), and gives back the subject and the HTML. It is a
+// mail.Renderer; it does not send anything: mail.Service does, with a driver.
+//
+// It is apart from package mail so a service that only sends emails does not
+// import hx/ssr.
 package hxmail
 
 import (
 	"cmp"
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"maps"
-	"path"
 	"reflect"
 	"strings"
 
 	"github.com/deltegui/hx"
 	"github.com/deltegui/hx/ssr"
-	"github.com/deltegui/owl/v3/files"
 	"github.com/deltegui/owl/v3/localizer"
 	"github.com/deltegui/owl/v3/mail"
 )
@@ -42,68 +46,53 @@ type permanent string
 func (e permanent) Error() string   { return string(e) }
 func (e permanent) Permanent() bool { return true }
 
-// Engine renders the emails with Hix and gives them to a mail.Driver. It is a
-// mail.Sender: a service gives it a mail.Message and the type of the payload
-// decides the template. It is safe for concurrent use once the templates are
-// registered, which is done when the program starts.
-type Engine struct {
-	driver    mail.Driver
-	tmp       files.Temp
-	resources files.Directory
+// Renderer renders the emails with Hix: the type of the payload of a message
+// decides the template. It is a mail.Renderer, and with its PayloadName and
+// DecodePayload it is the outbox.Payloads that package outbox needs, so the
+// types are registered only once. It is safe for concurrent use once the
+// templates are registered, which is done when the program starts.
+type Renderer struct {
 	lang      string
-	cids      map[string]string
 	templates map[reflect.Type]entry
 	byName    map[string]entry
 }
 
-// Option changes how an Engine works.
-type Option func(*Engine)
+var _ mail.Renderer = (*Renderer)(nil)
+
+// Option changes how a Renderer works.
+type Option func(*Renderer)
 
 // WithDefaultLang sets the language of the emails that do not say one, and the
 // one used when a template has no texts in the language of the email. It should
 // be the default language of the application.
-func WithDefaultLang(lang string) Option { return func(e *Engine) { e.lang = lang } }
+func WithDefaultLang(lang string) Option { return func(r *Renderer) { r.lang = lang } }
 
-// WithResources sets the directory where the resources of the emails (a
-// logo...) are. See WithCID.
-func WithResources(dir files.Directory) Option { return func(e *Engine) { e.resources = dir } }
-
-// WithCID adds a resource used by all the emails, a logo for example: the
-// views write it as <img src="cid:id">. The path is relative to the
-// resources directory (WithResources). Without one, it is a path in the Temp
-// directory. A template can add more in Template.CIDs.
-func WithCID(id, path string) Option { return func(e *Engine) { e.cids[id] = path } }
-
-// New creates an Engine. The driver sends what the engine renders; tmp is
-// where the driver finds the attachments and the resources.
-func New(driver mail.Driver, tmp files.Temp, opts ...Option) *Engine {
-	if driver == nil {
-		panic("hxmail: New with a nil driver")
-	}
-	e := &Engine{driver: driver, tmp: tmp, cids: map[string]string{}, templates: map[reflect.Type]entry{}, byName: map[string]entry{}}
+// New creates a Renderer with no templates. Add them with Register.
+func New(opts ...Option) *Renderer {
+	r := &Renderer{templates: map[reflect.Type]entry{}, byName: map[string]entry{}}
 	for _, opt := range opts {
-		opt(e)
+		opt(r)
 	}
-	return e
+	return r
 }
 
 // Template is how to build one kind of email, the one whose payload has type P.
 type Template[P any] struct {
 	// Texts are the translations. Unless Subject is set, they must have the key
 	// SubjectKey. The language is the one of the message, or the default one of
-	// the Engine if there are no texts in it (see localizer.Pick).
+	// the Renderer if there are no texts in it (see localizer.Pick).
 	Texts localizer.Source
 	// View builds the body of the email. If it builds an <html> element, the
-	// engine writes <!doctype html> before it. Text is escaped and URLs are
+	// renderer writes <!doctype html> before it. Text is escaped and URLs are
 	// checked by Hix, as in a page. Email clients support little CSS, so write
 	// the styles in the elements with Style.
 	View func(payload P, texts localizer.Localizer) hx.INode
 	// Subject builds the subject when it is not just Texts[SubjectKey].
 	Subject func(payload P, texts localizer.Localizer) string
-	// CIDs are the resources of this email, with the same rules as WithCID.
-	// They win over the ones of the Engine.
+	// CIDs are the resources of this email (see mail.WithCID). They win over the
+	// ones of the mail.Service.
 	CIDs map[string]string
-	// Driver sends this email instead of the one of the Engine.
+	// Driver sends this email instead of the one of the mail.Service.
 	Driver mail.Driver
 	// Name identifies the payload when it is stored (see PayloadName). It is the
 	// type, like "account.UserConfirmation", if it is empty. Set it if you want to
@@ -111,20 +100,20 @@ type Template[P any] struct {
 	Name string
 }
 
-// Register adds a template to the Engine. The email is the one whose payload
+// Register adds a template to the Renderer. The email is the one whose payload
 // has type P (or *P: a pointer to it is also accepted). It panics if View is
-// nil or the type already has a template: it is a mistake in the program, not
-// something to find when sending.
-func Register[P any](e *Engine, t Template[P]) {
+// nil or the type, or the name, already has a template: it is a mistake in the
+// program, not something to find when sending.
+func Register[P any](r *Renderer, t Template[P]) {
 	if t.View == nil {
 		panic("hxmail: Register with a nil View")
 	}
 	key := reflect.TypeFor[P]()
-	if _, ok := e.templates[key]; ok {
+	if _, ok := r.templates[key]; ok {
 		panic(fmt.Sprintf("hxmail: %v already has a template", key))
 	}
 	name := cmp.Or(t.Name, key.String())
-	if _, ok := e.byName[name]; ok {
+	if _, ok := r.byName[name]; ok {
 		panic(fmt.Sprintf("hxmail: the name %q is used by another template", name))
 	}
 	en := entry{
@@ -161,8 +150,8 @@ func Register[P any](e *Engine, t Template[P]) {
 			return p, nil
 		},
 	}
-	e.templates[key] = en
-	e.byName[name] = en
+	r.templates[key] = en
+	r.byName[name] = en
 }
 
 type entry struct {
@@ -174,47 +163,29 @@ type entry struct {
 	decode func(into func(any) error) (any, error)
 }
 
-// Send renders the message and gives it to the driver. It returns what the
-// driver returns, so a nil error means what it means for that driver.
-func (e *Engine) Send(ctx context.Context, msg mail.Message) error {
-	if err := msg.Validate(); err != nil {
-		return err
-	}
-	tpl, ok := e.lookup(msg.Payload)
+// Render builds the subject and the HTML of the message, in its language. It
+// does not check the message: mail.Service does that before it calls a renderer.
+func (r *Renderer) Render(_ context.Context, msg mail.Message) (mail.Rendered, error) {
+	tpl, ok := r.lookup(msg.Payload)
 	if !ok {
-		return fmt.Errorf("%w: %T", ErrNotRegistered, msg.Payload)
+		return mail.Rendered{}, fmt.Errorf("%w: %T", ErrNotRegistered, msg.Payload)
 	}
-
-	loc := localizer.Pick(tpl.texts, cmp.Or(msg.Lang, e.lang), e.lang)
+	loc := localizer.Pick(tpl.texts, cmp.Or(msg.Lang, r.lang), r.lang)
 	html, subject, err := tpl.render(msg.Payload, loc)
 	if err != nil {
-		return err
+		return mail.Rendered{}, err
 	}
-	cids, err := e.resolveCIDs(ctx, tpl)
-	if err != nil {
-		return err
-	}
-	driver := e.driver
-	if tpl.driver != nil {
-		driver = tpl.driver
-	}
-	return driver.Send(ctx, mail.Request{
-		Subject:  subject,
-		HTML:     html,
-		Envelope: msg.Envelope,
-		CIDs:     cids,
-		Payload:  msg.Payload,
-	}, e.tmp)
+	return mail.Rendered{Subject: subject, HTML: html, CIDs: maps.Clone(tpl.cids), Driver: tpl.driver}, nil
 }
 
-func (e *Engine) lookup(payload any) (entry, bool) {
+func (r *Renderer) lookup(payload any) (entry, bool) {
 	t := reflect.TypeOf(payload)
 	if t == nil {
 		return entry{}, false
 	}
-	tpl, ok := e.templates[t]
+	tpl, ok := r.templates[t]
 	if !ok && t.Kind() == reflect.Pointer {
-		tpl, ok = e.templates[t.Elem()]
+		tpl, ok = r.templates[t.Elem()]
 	}
 	return tpl, ok
 }
@@ -222,8 +193,8 @@ func (e *Engine) lookup(payload any) (entry, bool) {
 // PayloadName is the name the payload is stored with (Template.Name). The
 // bool is false if its type has no template. With DecodePayload, it is what
 // package outbox needs to keep an email and send it later.
-func (e *Engine) PayloadName(payload any) (string, bool) {
-	tpl, ok := e.lookup(payload)
+func (r *Renderer) PayloadName(payload any) (string, bool) {
+	tpl, ok := r.lookup(payload)
 	return tpl.name, ok
 }
 
@@ -232,40 +203,16 @@ func (e *Engine) PayloadName(payload any) (string, bool) {
 // format (JSON...) and hxmail does not import it; the payload is returned by
 // value, as Template[P] has it. The error is ErrNotRegistered if there is no
 // template with that name.
-func (e *Engine) DecodePayload(name string, decode func(into any) error) (any, error) {
-	tpl, ok := e.byName[name]
+func (r *Renderer) DecodePayload(name string, decode func(into any) error) (any, error) {
+	tpl, ok := r.byName[name]
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrNotRegistered, name)
 	}
 	return tpl.decode(decode)
 }
 
-// resolveCIDs joins the resources of the engine and the template. If there is
-// a resources directory they are copied to the Temp directory, where the
-// driver reads them: a Temp that expires (files.Temporal) would delete a logo
-// that was put there once.
-func (e *Engine) resolveCIDs(ctx context.Context, tpl entry) (map[string]string, error) {
-	if len(e.cids) == 0 && len(tpl.cids) == 0 {
-		return nil, nil
-	}
-	cids := maps.Clone(e.cids)
-	maps.Copy(cids, tpl.cids)
-	if e.resources == nil {
-		return cids, nil
-	}
-	for id, p := range cids {
-		dest := rand.Text() + "/" + path.Base(p) // a folder of its own: sends do not share files
-		stored, err := e.resources.CopyTo(ctx, p, dest, e.tmp)
-		if err != nil {
-			return nil, fmt.Errorf("hxmail: resource %q (cid %s): %w", p, id, err)
-		}
-		cids[id] = stored
-	}
-	return cids, nil
-}
-
 // render builds the view on the server. A panic in the view is an error: the
-// engine usually runs where a panic would take the program down.
+// renderer usually runs where a panic would take the program down.
 func render(build func() hx.INode) (html string, err error) {
 	defer func() {
 		if r := recover(); r != nil {

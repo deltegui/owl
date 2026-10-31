@@ -17,7 +17,7 @@ import (
 // Options configures a Worker. Store, Sender and Payloads are required.
 type Options struct {
 	Store Store
-	// Sender sends the emails that were kept, usually a hxmail.Engine.
+	// Sender sends the emails that were kept, usually a mail.Service.
 	Sender   mail.Sender
 	Payloads Payloads
 	// PollInterval is the time between two looks at the Store when nothing wakes

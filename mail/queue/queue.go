@@ -1,6 +1,6 @@
 // Package queue is a mail.Sender that sends in the background, from memory: Send
 // puts the email in a bounded queue and some goroutines give it to another
-// mail.Sender (usually a hxmail.Engine), so the caller does not wait for the
+// mail.Sender (usually a mail.Service), so the caller does not wait for the
 // mail server.
 //
 // Nothing is kept anywhere. A nil error from Send means "queued": if the

@@ -62,7 +62,7 @@ type Store interface {
 }
 
 // Payloads tells names and values of the payloads, so an email can be kept with
-// the name of its type and read back as the same type. hxmail.Engine implements
+// the name of its type and read back as the same type. hxmail.Renderer implements
 // it: the types are registered once, with its templates.
 type Payloads interface {
 	// PayloadName is the name of the type of the payload. The bool is false if the

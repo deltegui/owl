@@ -35,32 +35,34 @@ func (d *driver) Send(_ context.Context, r mail.Request, _ files.Temp) error {
 	return nil
 }
 
-// The web part keeps the email with the Engine as Payloads; the worker, which
-// could be another program, renders and sends it with the same Engine.
-func TestOutboxWithTheHxmailEngine(t *testing.T) {
+// The web part keeps the email with the Renderer as Payloads; the worker, which
+// could be another program, renders and sends it with a Service over the same
+// Renderer.
+func TestOutboxWithTheHxmailRenderer(t *testing.T) {
 	d := &driver{}
-	engine := hxmail.New(d, files.Temp{}, hxmail.WithDefaultLang("es"))
+	renderer := hxmail.New(hxmail.WithDefaultLang("es"))
+	service := mail.NewService(renderer, d, files.Temp{})
 	texts := func(subject string) localizer.Dict {
 		return localizer.Dict{"es": {"Subject": subject + " (es)"}, "en": {"Subject": subject + " (en)"}}
 	}
-	hxmail.Register(engine, hxmail.Template[confirmation]{
+	hxmail.Register(renderer, hxmail.Template[confirmation]{
 		Texts: texts("Confirm"),
 		View: func(p confirmation, t localizer.Localizer) hx.INode {
 			return hx.P().Textf("Hi %s %s", p.Name, p.note).Body(hx.A().Href(p.Link).Text("go"))
 		},
 	})
-	hxmail.Register(engine, hxmail.Template[reset]{
+	hxmail.Register(renderer, hxmail.Template[reset]{
 		Name:  "account-reset", // does not depend on the Go name
 		Texts: texts("Reset"),
 		View:  func(p reset, t localizer.Localizer) hx.INode { return hx.P().Text(p.Code) },
 	})
 
 	store := outbox.NewMemoryStore(nil)
-	worker, err := outbox.NewWorker(outbox.Options{Store: store, Sender: engine, Payloads: engine, PollInterval: time.Hour})
+	worker, err := outbox.NewWorker(outbox.Options{Store: store, Sender: service, Payloads: renderer, PollInterval: time.Hour})
 	if err != nil {
 		t.Fatal(err)
 	}
-	sender := outbox.NewSender(store, engine, outbox.WithWake(worker.Wake))
+	sender := outbox.NewSender(store, renderer, outbox.WithWake(worker.Wake))
 	ctx := context.Background()
 
 	to := mail.Envelope{To: []string{"ana@example.com"}}
