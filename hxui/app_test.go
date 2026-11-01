@@ -22,6 +22,7 @@ func TestAppHasMetaStateAndLoader(t *testing.T) {
 			Scripts: []hx.INode{hx.El("script").Src("/chart.js")}}, hx.Main().Body(in.Node()))
 	})
 	order := []string{
+		`window.__hxq`, // the recorder is first
 		`content="tok&#34;&lt;en" name="csrf-token"`, // escaped by Hix
 		`id="island-counter"`,
 		`id="island-counter-state"`,
@@ -43,7 +44,7 @@ func TestAppWithoutBundleIsHTML(t *testing.T) {
 	body := serve(t, "/list", func(ctx owl.Ctx) hx.INode {
 		return App(ctx, AppOptions{Title: "T"}, hx.P().Text("hi"))
 	})
-	if strings.Contains(body, "wasm") || strings.Contains(body, "Go()") {
+	if strings.Contains(body, "wasm") || strings.Contains(body, "Go()") || strings.Contains(body, "__hxq") {
 		t.Errorf("no bundle, no loader: %s", body)
 	}
 }

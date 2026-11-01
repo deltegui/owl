@@ -11,7 +11,7 @@ import (
 )
 
 // Run hydrates each of the islands that the page has, and then keeps the program
-// alive. An island in the page that is not in the list is a page that loaded the
+// alive. It also stops the recording of events that hxui.App starts in the head. An island in the page that is not in the list is a page that loaded the
 // wrong binary, and it is reported.
 func Run(islands ...Island) {
 	known := map[string]Island{}
@@ -32,5 +32,6 @@ func Run(islands ...Island) {
 		state := wasm.ReadState(StateID(name))
 		wasm.Hydrate(ID(name), func() hx.INode { return i.Hydrate(state) })
 	}
+	wasm.StopReplay() // every island is hydrated and has replayed what the user did
 	select {}
 }

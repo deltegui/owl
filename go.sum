@@ -1,5 +1,5 @@
-github.com/deltegui/hx v0.2.1 h1:jnG/2wOBgAUK6ET7y1og3E33+N/w3MdYQPUjMgRh2JA=
-github.com/deltegui/hx v0.2.1/go.mod h1:cCtp+JvesLsObKmKVufKWq+ksEMd1gOPE636xTYZuUc=
+github.com/deltegui/hx v0.3.0 h1:Aghixd0zwEDSgpwZFUhcpTVe5lrHrCMMCPfGBcGMa54=
+github.com/deltegui/hx v0.3.0/go.mod h1:cCtp+JvesLsObKmKVufKWq+ksEMd1gOPE636xTYZuUc=
 github.com/deltegui/valtruc v1.4.0 h1:Pe5ubAHXjU//Qns9B7cHXiBoNNmtciblCBV8PmNLNbM=
 github.com/deltegui/valtruc v1.4.0/go.mod h1:TJBNVVrPVPrIqFbJljmZ5ArIllSonEOW09KyDg7Mu3g=
 github.com/julienschmidt/httprouter v1.3.0 h1:U0609e9tgbseu3rBINet9P48AI/D3oJs4dN7jwJOQ1U=

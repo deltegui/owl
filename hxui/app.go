@@ -30,8 +30,9 @@ type AppOptions struct {
 	Islands []island.Instance
 }
 
-// App is Page for a page that carries a WASM program: the document, the CSRF
-// meta, the body, the state of the islands and, at the end, the scripts that
+// App is Page for a page that carries a WASM program: the document, the
+// script that keeps the clicks and text typed before the program is ready (hx.ReplayScript),
+// the CSRF meta, the body, the state of the islands and, at the end, the scripts that
 // start the program. The server renders the body and the islands in it; the
 // program hydrates them.
 //
@@ -41,6 +42,10 @@ func App(ctx owl.Ctx, o AppOptions, body ...hx.INode) hx.INode {
 	head := o.Head
 	if token := ctx.CsrfToken(); token != "" {
 		head = append([]hx.INode{hx.El("meta").Attribute("name", "csrf-token").Attribute("content", token)}, head...)
+	}
+	if o.Bundle != "" {
+		// Records what the user does while the WASM loads; island.Run replays it.
+		head = append([]hx.INode{hx.Raw(hx.ReplayScript())}, head...)
 	}
 	body = append(body[:len(body):len(body)], o.tail()...)
 	return Page(ctx, o.Title, head, body...)
