@@ -28,7 +28,7 @@ func Page(ctx owl.Ctx, title string, head []hx.INode, body ...hx.INode) hx.INode
 		hx.El("meta").Attribute("name", "viewport").Attribute("content", "width=device-width, initial-scale=1"),
 		hx.El("title").Text(title),
 	}
-	html := hx.El("html")
+	html := hx.Html()
 	if lang := ctx.GetCurrentLanguage(); lang != "" {
 		html.Attribute("lang", lang)
 	}
@@ -108,28 +108,6 @@ func (v View) FormErrors(field string) hx.INode {
 		items[i] = hx.Li().Class("form-error").Text(owl.FormatError(v.loc, err))
 	}
 	return hx.Span().Body(hx.Ul().Body(items...))
-}
-
-// Select is a <select> from an owl.SelectList. The text of each option is its
-// Tag translated.
-func (v View) Select(list owl.SelectList) hx.INode {
-	sel := hx.Select().Class("form-control", "phx-select").
-		Attribute("name", list.Name).Id(list.Name)
-	if list.Multiple {
-		sel.Attribute("multiple", "")
-	}
-	if list.Filtered {
-		sel.Attribute("filtered", "")
-	}
-	options := make([]hx.INode, len(list.Items))
-	for i, item := range list.Items {
-		option := hx.Option().Value(item.Value).Text(v.T(item.Tag))
-		if item.Selected {
-			option.Selected()
-		}
-		options[i] = option
-	}
-	return sel.Body(options...)
 }
 
 // PageLink returns the URL of the request with the page changed, keeping the

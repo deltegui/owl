@@ -64,19 +64,6 @@ func TestPageCsrfAndErrors(t *testing.T) {
 	}
 }
 
-func TestSelectIsTranslated(t *testing.T) {
-	body := serve(t, "/list", func(ctx owl.Ctx) hx.INode {
-		return NewView(ctx, view).Select(owl.SelectList{Name: "kind", Items: []owl.SelectItem{
-			{Value: "", Tag: "shared.choose"}, {Value: "1", Tag: "kind.one", Selected: true},
-		}})
-	})
-	for _, want := range []string{`name="kind"`, `id="kind"`, ">Elige<", ">Uno<", "selected"} {
-		if !strings.Contains(body, want) {
-			t.Errorf("missing %q in %s", want, body)
-		}
-	}
-}
-
 func TestPagination(t *testing.T) {
 	p := pagination.Pagination{CurrentPage: 3, ElementsPerPage: 10, TotalElements: 100}
 	body := serve(t, "/list?q=a+b&pagination.currentPage=3", func(ctx owl.Ctx) hx.INode { return Pagination(ctx, p, nil) })
