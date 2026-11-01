@@ -8,7 +8,10 @@
 //	var List = island.Define("products", func(s State) hx.INode { return Screen(s) })
 //
 // The server places it in a page with island.Mount(List, state) and the WASM of
-// the page carries it with island.Run(List).
+// the page carries it with island.Run(List). The name is the component, not the
+// instance: the same island can be mounted many times in a page, each one with
+// its own state. An element says which component it is (data-island) and which
+// script has its state (data-island-state).
 //
 // This package imports only Hix and the standard library (no OWL root, no
 // net/http), so a WASM binary can import it. Run is in a file that only
@@ -22,12 +25,6 @@ import (
 
 	"github.com/deltegui/hx"
 )
-
-// ID is the id of the element of the island called name.
-func ID(name string) string { return "island-" + name }
-
-// StateID is the id of the script element that has the state of the island.
-func StateID(name string) string { return "island-" + name + "-state" }
 
 // Island is what Run hydrates: a name and a way to build from the text of the state.
 type Island interface {
@@ -43,8 +40,9 @@ type Def[S any] struct {
 	build func(S) hx.INode
 }
 
-// Define makes the island called name. The name is what ties the element, the
-// state and the code in the browser together, so it must be unique in a page.
+// Define makes the island called name. The name is what ties the elements and
+// the code in the browser together. It identifies the component, so the island
+// can be placed more than once in a page.
 func Define[S any](name string, build func(S) hx.INode) Def[S] {
 	if name == "" || build == nil {
 		panic("island: Define needs a name and a build function")
@@ -86,15 +84,35 @@ func Func(name string, build func(state string) hx.INode) Island {
 type Instance struct {
 	Island Island
 	State  string
+
+	stateID string // id of the script with the state; Mount makes it
 }
 
-// Mount places the island with a state. The state is encoded as JSON.
+// Mount places the island with a state. The state is encoded as JSON. Every
+// call is a new instance, with its own state script, even for the same island.
 func Mount[S any](d Def[S], state S) Instance {
 	text, err := json.Marshal(state)
 	if err != nil {
 		panic(fmt.Sprintf("island %q: the state does not encode: %v", d.name, err))
 	}
-	return Instance{Island: d, State: string(text)}
+	return Instance{Island: d, State: string(text), stateID: d.name + "-" + newID()}
+}
+
+// MountText places an island whose state is plain text (see Func) or one that
+// builds its own state. The text is written as is. Like Mount, every call is a
+// new instance.
+func MountText(i Island, state string) Instance {
+	return Instance{Island: i, State: state, stateID: i.Name() + "-" + newID()}
+}
+
+// scriptID is the id of the script with the state. An Instance that was not made
+// by Mount or MountText has no id of its own, and takes "NAME-state": it works,
+// but only once per name in a page.
+func (i Instance) scriptID() string {
+	if i.stateID != "" {
+		return i.stateID
+	}
+	return i.Name() + "-state"
 }
 
 // Name is the name of the island.
@@ -104,9 +122,14 @@ func (i Instance) Name() string { return i.Island.Name() }
 func (i Instance) Build(state string) hx.INode { return i.Island.Hydrate(state) }
 
 // Node is the element of the island with the island built inside. Put it where
-// the island goes.
+// the island goes. data-island is the component and data-island-state the id of
+// the script that has the state of this instance.
 func (i Instance) Node() hx.INode {
-	return hx.Div().Id(ID(i.Name())).Attribute("data-island", i.Name()).Body(i.Island.Hydrate(i.State))
+	host := hx.Div().Attribute("data-island", i.Name())
+	if i.State != "" {
+		host.Attribute("data-island-state", i.scriptID())
+	}
+	return host.Body(i.Island.Hydrate(i.State))
 }
 
 // StateScript is the script element with the state. Put it in the page after
@@ -115,5 +138,5 @@ func (i Instance) StateScript() hx.INode {
 	if i.State == "" {
 		return hx.Noop()
 	}
-	return hx.Raw(hx.StateScript(StateID(i.Name()), i.State))
+	return hx.Raw(hx.StateScript(i.scriptID(), i.State))
 }

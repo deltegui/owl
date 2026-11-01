@@ -42,7 +42,7 @@ func writePage(w io.Writer, html string) error {
 // FormatError translates a validation error: the name of the field and the
 // message of the rule come from the localizer, and the error fills in its own
 // values (a minimum, a maximum...). It is for code that builds its own answer,
-// for example a JSON one; views get it from hxui.View.
+// for example a JSON one; views get it from hxui.ViewData.
 func FormatError(loc localizer.Localizer, err core.ValidationError) string {
 	field := loc.Get(err.GetFieldName())
 	return err.Format(loc.GetFormatted(string(err.GetIdentifier()), field))

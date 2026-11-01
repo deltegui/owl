@@ -43,8 +43,9 @@ var List = island.Define("products", func(s State) hx.INode {
 ```
 
 `Define[S](name, build)` ties a **name**, a **state type** and a **builder**
-together. The name must be unique in a page. The state is encoded as JSON, so
-only exported fields with JSON tags travel.
+together. The name identifies the *component*, not an instance: the same island
+can be placed many times in a page (see [Repeating an island](#repeating-an-island)).
+The state is encoded as JSON, so only exported fields with JSON tags travel.
 
 The builder is called twice with equal input: once on the server (to render the
 HTML) and once in the browser (to hydrate it). It must be deterministic from the
@@ -69,8 +70,10 @@ func showProducts(ctx owl.Ctx) error {
 `island.Mount(def, state)` returns an `island.Instance` (the island plus its
 JSON state). Use:
 
-- `in.Node()` where the island goes: a `<div id="island-NAME" data-island="NAME">`
-  with the island already built inside.
+- `in.Node()` where the island goes: a `<div data-island="NAME"
+  data-island-state="NAME-ID">` with the island already built inside. `data-island`
+  says which component it is; `data-island-state` is the id of the script that
+  has the state of this instance.
 - `in.StateScript()` after the HTML of the islands (`hxui.App` does it for the
   islands in `AppOptions.Islands`).
 
@@ -91,8 +94,9 @@ func main() {
 }
 ```
 
-`island.Run(islands...)` finds the islands the page has (by id), reads each
-state, hydrates it and then blocks forever so the program stays alive. It logs
+`island.Run(islands...)` finds every element with `data-island` in the page,
+reads its state from the script named by `data-island-state`, hydrates it and
+then blocks forever so the program stays alive. It logs
 `the page has the island "x", and this binary does not carry it` if the page
 holds an island the binary does not know: the page loaded the wrong bundle.
 
@@ -107,24 +111,44 @@ islands out of the light pages.
 func Define[S any](name string, build func(S) hx.INode) Def[S]
 func Mount[S any](d Def[S], state S) Instance
 func Func(name string, build func(state string) hx.INode) Island
+func MountText(i Island, state string) Instance // for Func islands: the state is text
 func Run(islands ...Island)           // js/wasm only
-func ID(name string) string           // "island-" + name
-func StateID(name string) string      // "island-" + name + "-state"
 ```
 
 | Type | Methods |
 |---|---|
 | `Def[S]` | `Name()`, `Build(state S) hx.INode` (from a value), `Hydrate(state string) hx.INode` (from JSON text; empty text is the zero state; a state that does not decode is logged and what decoded is used). |
 | `Island` (interface) | `Name() string`, `Hydrate(state string) hx.INode`. `Def[S]` implements it. |
-| `Instance{Island, State}` | `Name()`, `Build(state string)`, `Node()`, `StateScript()`. |
+| `Instance` | `Name()`, `Build(state string)`, `Node()`, `StateScript()`. Made by `Mount`: each call is a new instance with its own state id (`NAME-` plus random text). |
 
 `island.Func(name, build)` is an island whose state is plain text, not JSON (a
 label, a theme name). Use it for tiny islands, or to adapt code that was written
 as a registry of functions.
 
-The state is read from `<script type="application/json" id="island-NAME-state">`;
-`hx.StateScript` escapes `<`, `>`, `&` and the line separators so the JSON can
+The state of each instance is read from `<script type="application/json" id="NAME-ID">`,
+the id that its element has in `data-island-state`; `hx.StateScript` escapes `<`, `>`, `&` and the line separators so the JSON can
 never close the script element.
+
+## Repeating an island
+
+An island is a component, and every `Mount` is an instance of it. Place it as
+many times as you need, with a different state each time:
+
+```go
+country := island.Mount(selectweb.Select, selectweb.State{URL: "/api/countries"})
+category := island.Mount(selectweb.Select, selectweb.State{URL: "/api/categories"})
+// Node() of each goes where it belongs; both go in AppOptions.Islands.
+```
+
+The WASM carries the component once (`island.Run(selectweb.Select)`) and
+hydrates every element of the page that says `data-island="select"`, each one
+with its own state. The server can create as many as it wants, even a number
+that depends on data, because the browser discovers them in the page. What
+changes from one use to another (a URL, a label) goes in the state, not in the
+code. If something outside the island must refer to one instance (a
+`<label for>`), put that id in the state.
+
+Islands inside islands are not supported.
 
 ## hxui.App
 
@@ -146,7 +170,7 @@ type AppOptions struct {
 1. In the head: `<meta name="csrf-token">` (when the request has a token, which
    `island/client` reads), then your `Head`.
 2. Your `body`.
-3. The state `<script>` of every island in `Islands`.
+3. The state `<script>` of every instance in `Islands`.
 4. With a `Bundle`: your `Scripts`, then `<WasmDir>wasm_exec.js`, then an inline
    loader that fetches and starts `<WasmDir><Bundle>.wasm`.
 

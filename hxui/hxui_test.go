@@ -44,10 +44,10 @@ func serve(t *testing.T, target string, view func(ctx owl.Ctx) hx.INode) string 
 func TestPageCsrfAndErrors(t *testing.T) {
 	body := serve(t, "/list", func(ctx owl.Ctx) hx.INode {
 		ctx.Validate(form{})
-		v := NewView(ctx, view)
+		vd := NewViewData(ctx, view)
 		return Page(ctx, "T <1>", []hx.INode{Stylesheet("/a.css")},
-			hx.Form().Body(v.CsrfInput(), v.FormErrors("Name"), v.FormErrors("Other"),
-				hx.P().Text(v.T("Hello", "<Ana>"))),
+			hx.Form().Body(vd.CsrfInput(), vd.FormErrors("Name"), vd.FormErrors("Other"),
+				hx.P().Text(vd.T("Hello", "<Ana>"))),
 		)
 	})
 	for _, want := range []string{

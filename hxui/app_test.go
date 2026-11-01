@@ -24,8 +24,8 @@ func TestAppHasMetaStateAndLoader(t *testing.T) {
 	order := []string{
 		`window.__hxq`, // the recorder is first
 		`content="tok&#34;&lt;en" name="csrf-token"`, // escaped by Hix
-		`id="island-counter"`,
-		`id="island-counter-state"`,
+		`data-island="counter"`,
+		`type="application/json" id="counter-`,
 		`/chart.js`,
 		`src="/js/wasm_exec.js"`,
 		`fetch("/js/full.wasm")`,

@@ -64,13 +64,14 @@ hxui.Page(ctx, "Products",
 
 For a page that loads a WASM program use [`hxui.App`](islands.md#hxuiapp).
 
-### View: translations, forms and errors
+### ViewData: translations, forms and errors
 
 ```go
-func NewView(ctx owl.Ctx, texts localizer.Source) View
+func NewViewData(ctx owl.Ctx, texts localizer.Source) ViewData
 ```
 
-Make one at the start of the view. It holds the translations of the component
+Make one at the start of the view: it is everything the view needs besides your
+own data. It holds the translations of the component
 (`texts`, usually a [`localizer.Dict`](localization.md)) in the language of the
 request, plus the shared ones from `AddLocalization`.
 
@@ -85,11 +86,11 @@ request, plus the shared ones from `AddLocalization`.
 | `Ctx` | The `owl.Ctx`, for anything else. |
 
 ```go
-v := hxui.NewView(ctx, productTexts)
-hx.Div().ClassIf("has-error", v.HaveFormError("Name")).Body(
-	hx.Label().Text(v.T("Name")),
+vd := hxui.NewViewData(ctx, productTexts)
+hx.Div().ClassIf("has-error", vd.HaveFormError("Name")).Body(
+	hx.Label().Text(vd.T("Name")),
 	hx.Input().Type("text").Attribute("name", "Name"),
-	v.FormErrors("Name"),
+	vd.FormErrors("Name"),
 )
 ```
 

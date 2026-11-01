@@ -84,7 +84,7 @@ if !ctx.ModelState.Valid {
   (`Lines[0].Account`).
 - Each `core.ValidationError` has the field name, the rule identifier and the
   values needed to build the message.
-- Show the errors in a view with [`hxui.View.FormErrors`](views.md#view-translations-forms-and-errors),
+- Show the errors in a view with [`hxui.ViewData.FormErrors`](views.md#viewdata-translations-forms-and-errors),
   or translate them yourself with `owl.FormatError(localizer, err)`.
 - For JSON answers use [`ctx.JsonInvalid`](islands.md#answering-errors).
 

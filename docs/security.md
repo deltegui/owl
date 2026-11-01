@@ -104,7 +104,7 @@ no-store` and `Vary: Cookie`, since they carry the token.
 
 | Where | How |
 |---|---|
-| A form in a view | `v.CsrfInput()` of `hxui.View`, a hidden input. |
+| A form in a view | `vd.CsrfInput()` of `hxui.ViewData`, a hidden input. |
 | JavaScript or WASM | `hxui.Page`/`App`: put `<meta name="csrf-token" content="…">` (`App` does it) and send the value in `X-Csrf-Token`. `island/client.Send` does both. |
 | Another client | Read the token from a GET response and send it in the header. |
 

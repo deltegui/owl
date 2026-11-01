@@ -24,9 +24,10 @@ type AppOptions struct {
 	// They must be plain script elements, not Script: a deferred one would run
 	// after the program has started.
 	Scripts []hx.INode
-	// Islands are the ones the page has: their state goes after the body, where
-	// the browser reads it when the WASM starts. Their elements go where
-	// the page wants them, with island.Instance.Node.
+	// Islands are the instances the page has (the same island may appear more
+	// than once): the state of each goes after the body, where the browser reads
+	// it when the WASM starts. Their elements go where the page wants them, with
+	// island.Instance.Node.
 	Islands []island.Instance
 }
 

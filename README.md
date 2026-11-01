@@ -49,17 +49,17 @@ var loginTexts = localizer.Dict{
 // The view builds the page with Hix.
 func loginView(form loginForm) owl.HixView {
 	return func(ctx owl.Ctx) hx.INode {
-		v := hxui.NewView(ctx, loginTexts) // translations in the language of the request
-		return hxui.Page(ctx, v.T("Login"), nil,
+		vd := hxui.NewViewData(ctx, loginTexts) // translations in the language of the request
+		return hxui.Page(ctx, vd.T("Login"), nil,
 			hx.Form().Attribute("action", "/account/login").Attribute("method", "post").Body(
-				v.CsrfInput(), // hidden input with the CSRF token
-				hx.Label().Text(v.T("Name")),
+				vd.CsrfInput(), // hidden input with the CSRF token
+				hx.Label().Text(vd.T("Name")),
 				hx.Input().Type("text").Attribute("name", "Name").Value(form.Name),
-				v.FormErrors("Name"), // validation errors of the field "Name"
-				hx.Label().Text(v.T("Password")),
+				vd.FormErrors("Name"), // validation errors of the field "Name"
+				hx.Label().Text(vd.T("Password")),
 				hx.Input().Type("password").Attribute("name", "Password"),
-				v.FormErrors("Password"),
-				hx.Button().Type("submit").Text(v.T("Login")),
+				vd.FormErrors("Password"),
+				hx.Button().Type("submit").Text(vd.T("Login")),
 			),
 		)
 	}
@@ -164,7 +164,7 @@ owl/middleware           Logger, Cors, Csrf, Authorize, AuthorizeRoles, Admin
 owl/hash                 Argon2id and bcrypt
 owl/localizer            Dict, Localizer, Pick, Check   (compiles to WASM)
 owl/localizer/webstore   language cookie and application translations
-owl/hxui                 Page, App, View, Pagination
+owl/hxui                 Page, App, ViewData, Pagination
 owl/island               Define, Mount, Run            (compiles to WASM)
 owl/island/client        Send, Errors, Escape          (compiles to WASM)
 owl/pagination           List, Pagination, ViewModel

@@ -48,36 +48,37 @@ func Script(src string) hx.INode {
 	return hx.El("script").Src(src).Attribute("defer", "")
 }
 
-// View is what a view made with Hix works with: the translations of a component
-// (a localizer.Source, usually a Dict, plus the shared ones of AddLocalization), and through Ctx
-// the model state and the CSRF token. Make one at the start of the HixView.
+// ViewData is what a view made with Hix needs besides your own data: the
+// translations of a component (a localizer.Source, usually a Dict, plus the
+// shared ones of AddLocalization), and through Ctx the model state and the CSRF
+// token. Make one at the start of the HixView.
 //
 //	func(ctx owl.Ctx) hx.INode {
-//		v := hxui.NewView(ctx, texts)
-//		return hx.Label().Text(v.T("Name"))...
-type View struct {
+//		vd := hxui.NewViewData(ctx, texts)
+//		return hx.Label().Text(vd.T("Name"))...
+type ViewData struct {
 	Ctx owl.Ctx
 	loc localizer.Localizer
 }
 
-// NewView gets the translations of the component for the language of the request.
-func NewView(ctx owl.Ctx, texts localizer.Source) View {
-	return View{Ctx: ctx, loc: ctx.Texts(texts)}
+// NewViewData gets the translations of the component for the language of the request.
+func NewViewData(ctx owl.Ctx, texts localizer.Source) ViewData {
+	return ViewData{Ctx: ctx, loc: ctx.Texts(texts)}
 }
 
 // T is the key translated, with fmt arguments.
-func (v View) T(key string, args ...any) string { return v.loc.GetFormatted(key, args...) }
+func (v ViewData) T(key string, args ...any) string { return v.loc.GetFormatted(key, args...) }
 
 // LocalizeError translates a DomainError with the errors file.
-func (v View) LocalizeError(err core.DomainError) string { return v.Ctx.LocalizeError(err) }
+func (v ViewData) LocalizeError(err core.DomainError) string { return v.Ctx.LocalizeError(err) }
 
 // CsrfInput is the hidden input with the CSRF token of the request.
-func (v View) CsrfInput() hx.INode {
+func (v ViewData) CsrfInput() hx.INode {
 	return hx.Input().Type("hidden").Attribute("name", csrf.FieldName).Value(v.Ctx.CsrfToken())
 }
 
 // errorsOf is the validation errors of a field, or nothing if it is valid.
-func (v View) errorsOf(field string) []core.ValidationError {
+func (v ViewData) errorsOf(field string) []core.ValidationError {
 	if v.Ctx.ModelState.Valid {
 		return nil
 	}
@@ -85,10 +86,10 @@ func (v View) errorsOf(field string) []core.ValidationError {
 }
 
 // HaveFormError tells if the validation of the field failed (see ctx.Validate).
-func (v View) HaveFormError(field string) bool { return len(v.errorsOf(field)) > 0 }
+func (v ViewData) HaveFormError(field string) bool { return len(v.errorsOf(field)) > 0 }
 
 // FormError is the first error of the field, translated, or an empty string.
-func (v View) FormError(field string) string {
+func (v ViewData) FormError(field string) string {
 	errs := v.errorsOf(field)
 	if len(errs) == 0 {
 		return ""
@@ -98,7 +99,7 @@ func (v View) FormError(field string) string {
 
 // FormErrors is the list of errors of a field, translated, or nothing if the
 // field is valid. Each item has the class form-error.
-func (v View) FormErrors(field string) hx.INode {
+func (v ViewData) FormErrors(field string) hx.INode {
 	errs := v.errorsOf(field)
 	if len(errs) == 0 {
 		return hx.Noop()

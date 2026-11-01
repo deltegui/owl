@@ -133,7 +133,7 @@ can change it. Without localization it is empty, so every key shows as itself.
 
 ### In views
 
-`hxui.NewView(ctx, texts)` does the same and gives you `v.T(key, args...)`. See
+`hxui.NewViewData(ctx, texts)` does the same and gives you `vd.T(key, args...)`. See
 [views](views.md).
 
 ### Domain errors
