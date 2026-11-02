@@ -113,7 +113,7 @@ func (c Cell) String() string {
 
 func formatDecimal(unscaled int64, scale int) string {
 	neg := unscaled < 0
-	u := uint64(unscaled)
+	u := uint64(unscaled) //nolint:gosec // G115: a propósito, el complemento a dos da el valor absoluto al negar
 	if neg {
 		u = -u // right even for the minimum int64
 	}

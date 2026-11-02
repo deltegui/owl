@@ -170,3 +170,31 @@ func TestMimicDoesNotPanic(t *testing.T) {
 		h.Mimic(strings.Repeat("a", 100))
 	}
 }
+
+func TestArgon2RefusesParametersThatAskForTooMuch(t *testing.T) {
+	salt, key := "c2FsdHNhbHRzYWx0c2FsdA", "a2V5a2V5a2V5a2V5a2V5a2V5a2V5a2V5a2V5a2V5"
+	for name, params := range map[string]string{
+		"memory":           "m=4294967295,t=1,p=1",
+		"memory just over": "m=1048577,t=1,p=1",
+		"passes":           "m=64,t=4294967295,p=1",
+		"passes just over": "m=64,t=33,p=1",
+	} {
+		encoded := "$argon2id$v=19$" + params + "$" + salt + "$" + key
+		if ok, err := (Argon2{}).Check(encoded, "x"); ok || !errors.Is(err, ErrInvalidHash) {
+			t.Errorf("%s: ok=%v err=%v, want ErrInvalidHash", name, ok, err)
+		}
+		if !(Argon2{}).NeedsRehash(encoded) {
+			t.Errorf("%s: a hash that cannot be read needs a new one", name)
+		}
+	}
+}
+
+func TestArgon2StillReadsTheLimitParameters(t *testing.T) {
+	// The limits themselves are fine: parse them without running argon2 (1 GiB).
+	for _, params := range []string{"m=1048576,t=32,p=1"} {
+		encoded := "$argon2id$v=19$" + params + "$c2FsdHNhbHRzYWx0c2FsdA$a2V5a2V5a2V5a2V5a2V5a2V5a2V5a2V5"
+		if _, err := parse(encoded); err != nil {
+			t.Errorf("%s: %v", params, err)
+		}
+	}
+}

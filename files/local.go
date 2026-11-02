@@ -64,7 +64,7 @@ func (l *Local) Write(ctx context.Context, name string, content io.Reader) (stri
 		err = l.root.Rename(tmp, name)
 	}
 	if err != nil {
-		l.root.Remove(tmp)
+		_ = l.root.Remove(tmp)
 		return "", err
 	}
 	return name, nil
@@ -84,7 +84,7 @@ func (l *Local) Open(ctx context.Context, name string) (io.ReadCloser, error) {
 	}
 	info, err := f.Stat()
 	if err != nil || info.IsDir() {
-		f.Close()
+		_ = f.Close()
 		return nil, mapErr(err, ErrNotFound)
 	}
 	return f, nil

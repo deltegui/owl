@@ -88,13 +88,16 @@ func (ws Store) CreateCookie(w http.ResponseWriter, localization string) error {
 	if err != nil {
 		return fmt.Errorf("cannot create language cookie: %w", err)
 	}
-	http.SetCookie(w, &http.Cookie{
+	// Es una preferencia (sellada), no una credencial, y no hay un Secure que
+	// valga en http y en https: gosec lo avisa y no hace falta.
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // G124: preferencia de idioma, sin Secure a propósito
 		Name:     cookieKey,
 		Value:    encode,
 		Expires:  time.Now().Add(core.OneDayDuration),
 		MaxAge:   int(core.OneDayDuration.Seconds()),
 		Path:     "/",
-		SameSite: http.SameSiteDefaultMode,
+		SameSite: http.SameSiteLaxMode,
+		HttpOnly: true,
 	})
 	return nil
 }

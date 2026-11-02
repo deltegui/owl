@@ -25,7 +25,7 @@ const (
 // only opens it with the same one.
 func Seal(c core.Cipher, purpose, data string) (string, error) {
 	plain := make([]byte, stampBytes, stampBytes+len(data))
-	binary.BigEndian.PutUint64(plain, uint64(time.Now().Unix()))
+	binary.BigEndian.PutUint64(plain, uint64(time.Now().Unix())) //nolint:gosec // G115: Unix() solo es negativo con un reloj anterior a 1970
 	plain = append(plain, data...)
 	sealed, err := c.Encrypt(plain, []byte(purpose))
 	if err != nil {
@@ -48,7 +48,8 @@ func Open(c core.Cipher, purpose, token string, maxAge time.Duration) (string, e
 	if len(plain) < stampBytes {
 		return "", errors.New("cannot open: malformed value")
 	}
-	sealedAt := time.Unix(int64(binary.BigEndian.Uint64(plain)), 0)
+	// El valor sale de descifrar con AES-GCM: solo pudo escribirlo Seal con una hora real.
+	sealedAt := time.Unix(int64(binary.BigEndian.Uint64(plain)), 0) //nolint:gosec // G115: autenticado; si diera negativo, solo caduca
 	now := time.Now()
 	if sealedAt.After(now.Add(clockSkew)) {
 		return "", errors.New("cannot open: sealed in the future")

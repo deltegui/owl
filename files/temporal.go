@@ -126,7 +126,7 @@ func (t *Temporal) clean() {
 	t.last.Store(now.UnixNano())
 
 	var dirs []string
-	fs.WalkDir(t.local.root.FS(), ".", func(name string, d fs.DirEntry, err error) error {
+	_ = fs.WalkDir(t.local.root.FS(), ".", func(name string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -135,7 +135,7 @@ func (t *Temporal) clean() {
 			dirs = append(dirs, name)
 		case d.Type().IsRegular():
 			if info, err := d.Info(); err == nil && t.delete(name, info, now) {
-				t.local.root.Remove(name)
+				_ = t.local.root.Remove(name)
 			}
 		}
 		return nil
@@ -143,6 +143,6 @@ func (t *Temporal) clean() {
 	// The walk lists parents before children: remove in reverse. Remove fails
 	// on a folder that is not empty, which is what we want.
 	for i := len(dirs) - 1; i >= 0; i-- {
-		t.local.root.Remove(dirs[i])
+		_ = t.local.root.Remove(dirs[i])
 	}
 }

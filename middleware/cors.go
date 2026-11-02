@@ -2,10 +2,9 @@ package middleware
 
 import (
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
-
-	"slices"
 
 	"github.com/deltegui/owl/v3"
 )

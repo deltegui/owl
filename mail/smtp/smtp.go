@@ -127,17 +127,17 @@ func (d *Driver) deliver(ctx context.Context, out *outgoing) error {
 	if err != nil {
 		return fmt.Errorf("smtp: connecting: %w", err)
 	}
-	// net/smtp knows nothing about contexts: the deadline and closing the
-	// connection are what stop it.
-	if dl, ok := ctx.Deadline(); ok {
-		conn.SetDeadline(dl)
-	}
-	stop := context.AfterFunc(ctx, func() { conn.Close() })
+	// net/smtp knows nothing about contexts: closing the connection when the
+	// context ends is what stops it. There is no deadline on the connection on
+	// purpose: it would run out at the same moment as the context, and a read
+	// that fails first would return a bare "i/o timeout" before ctx.Err() says
+	// DeadlineExceeded. Closing it from the context is always after ctx.Err().
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
 	defer stop()
 
 	c, err := netsmtp.NewClient(conn, d.o.Host)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return fmt.Errorf("smtp: greeting: %w", err)
 	}
 	defer c.Close()
@@ -176,7 +176,7 @@ func (d *Driver) deliver(ctx context.Context, out *outgoing) error {
 	if err := w.Close(); err != nil {
 		return fmt.Errorf("smtp: the server did not accept the message: %w", err)
 	}
-	c.Quit() // the message is accepted: a failure here does not matter
+	_ = c.Quit() // the message is accepted: a failure here does not matter
 	return nil
 }
 

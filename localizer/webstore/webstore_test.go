@@ -141,3 +141,19 @@ func testCipher(t *testing.T) *cipher.AES256 {
 	}
 	return c
 }
+
+func TestLanguageCookieIsHttpOnlyAndSameSiteLax(t *testing.T) {
+	store := New(nil, nil, []string{"es", "en"}, testCipher(t))
+	rec := httptest.NewRecorder()
+	if err := store.CreateCookie(rec, "en"); err != nil {
+		t.Fatal(err)
+	}
+	cookies := rec.Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatalf("want one cookie, got %+v", cookies)
+	}
+	c := cookies[0]
+	if c.Name != cookieKey || !c.HttpOnly || c.SameSite != http.SameSiteLaxMode || c.Path != "/" || c.MaxAge <= 0 {
+		t.Fatalf("unexpected language cookie: %+v", c)
+	}
+}

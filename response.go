@@ -47,7 +47,7 @@ func (w *responseWriter) commit() {
 // Flush sends what is written so far, for streaming handlers.
 func (w *responseWriter) Flush() {
 	w.commit()
-	http.NewResponseController(w.ResponseWriter).Flush()
+	_ = http.NewResponseController(w.ResponseWriter).Flush()
 }
 
 // Unwrap lets http.ResponseController reach the real writer (Hijack, deadlines).

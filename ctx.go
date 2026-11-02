@@ -338,13 +338,15 @@ func (ctx *Ctx) CreateCookieOptions(opt CookieOptions) error {
 		return fmt.Errorf("error sealing cookie: %w", err)
 	}
 
-	http.SetCookie(ctx.Res, &http.Cookie{
+	// HttpOnly y Secure los elige quien llama (CookieOptions, documentado); gosec
+	// no se fía de lo que no es constante. SameSite es siempre Lax.
+	http.SetCookie(ctx.Res, &http.Cookie{ //nolint:gosec // G124: HttpOnly y Secure son opciones del usuario
 		Name:     opt.Name,
 		Value:    data,
 		Expires:  time.Now().Add(opt.Expires),
 		MaxAge:   int(opt.Expires.Seconds()),
 		Path:     "/",
-		SameSite: http.SameSiteDefaultMode,
+		SameSite: http.SameSiteLaxMode,
 		HttpOnly: opt.HttpOnly,
 		Secure:   opt.Secure,
 	})
@@ -383,13 +385,16 @@ func (ctx *Ctx) DeleteCookie(name string) error {
 	if err != nil {
 		return fmt.Errorf("error while reading cookie with key: '%s': %w", name, err)
 	}
-	http.SetCookie(ctx.Res, &http.Cookie{
+	// Borrar una cookie solo depende del nombre y de la ruta: Secure no cambia nada
+	// (y no hay un valor que valga en http y en https).
+	http.SetCookie(ctx.Res, &http.Cookie{ //nolint:gosec // G124: borrar no depende de Secure
 		Name:     name,
 		Value:    "",
 		Expires:  time.Unix(0, 0),
-		MaxAge:   0,
+		MaxAge:   -1,
 		Path:     "/",
-		SameSite: http.SameSiteDefaultMode,
+		SameSite: http.SameSiteLaxMode,
+		HttpOnly: true,
 	})
 	return nil
 }

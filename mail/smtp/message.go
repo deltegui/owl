@@ -45,7 +45,7 @@ type attachment struct {
 
 func (o *outgoing) close() {
 	for _, a := range slices.Concat(o.files, o.inline) {
-		a.r.Close()
+		_ = a.r.Close()
 	}
 }
 

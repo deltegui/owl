@@ -1,0 +1,113 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+issues:
+  uniq-by-line: false
+  # Que no esconda hallazgos repetidos del mismo tipo.
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - unused
+    - revive
+    - gocritic
+    - depguard
+    - gosec
+  settings:
+    revive:
+      rules:
+        - name: var-naming
+          arguments:
+            # Id, Html, Json y Http se quedan así en la API pública (Json, JsonOk, HttpOnly...).
+            - [ID, HTML, JSON, HTTP]
+            - []
+    depguard:
+      rules:
+        # Estos paquetes se importan desde WASM: no pueden arrastrar net/http ni
+        # el resto del servidor (localizer solo usa fmt y slices a propósito).
+        wasm-light:
+          files:
+            - "**/localizer/*.go"
+            - "!**/localizer/webstore/**"
+            - "**/pagination/**"
+            - "**/island/**"
+            - "!$test"
+          deny:
+            - pkg: net/http
+              desc: "se importa desde WASM; suma cientos de KB"
+            - pkg: os
+              desc: "se importa desde WASM"
+            - pkg: github.com/deltegui/hx/ssr
+              desc: "el motor del servidor no va en el cliente"
+            - pkg: github.com/deltegui/owl/v3/localizer/webstore
+              desc: "es la parte de servidor del localizador"
+            - pkg: github.com/deltegui/owl/v3/core
+              desc: "arrastra dependencias de servidor"
+            - pkg: github.com/deltegui/owl/v3/cipher
+              desc: "es de servidor"
+            - pkg: github.com/deltegui/owl/v3/session
+              desc: "es de servidor"
+            - pkg: github.com/deltegui/owl/v3/csrf
+              desc: "es de servidor"
+            - pkg: github.com/deltegui/owl/v3/middleware
+              desc: "es de servidor"
+            - pkg: github.com/deltegui/owl/v3/mail
+              desc: "es de servidor"
+            - pkg: github.com/deltegui/owl/v3/files
+              desc: "es de servidor"
+        # syscall/js solo en ficheros _wasm.go.
+        js-only-in-wasm-files:
+          files:
+            - "$all"
+            - "!**/*_wasm.go"
+          deny:
+            - pkg: syscall/js
+              desc: "va en un fichero _wasm.go con su _native.go vacío"
+        # Piezas del servidor sin dependencias externas ni Hix: biblioteca estándar
+        # y los propios paquetes de owl.
+        stdlib-only:
+          files:
+            - "**/cipher/**"
+            - "**/csrf/**"
+            - "**/session/**"
+            - "**/files/**"
+            - "**/excel/**"
+            - "**/pdf/*.go"
+            - "**/mail/*.go"
+            - "**/mail/smtp/**"
+            - "**/mail/outbox/**"
+            - "**/mail/queue/**"
+            - "**/middleware/**"
+            - "**/logx/**"
+            - "**/localizer/**"
+            - "**/pagination/**"
+            - "!$test"
+          allow:
+            - $gostd
+            - github.com/deltegui/owl/v3
+  exclusions:
+    presets:
+      - comments
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters: [gosec, errcheck]
+      # Estas cookies llevan HttpOnly y SameSite=Lax; Secure es una opción
+      # documentada (WithSecure, true por defecto) para poder probar en http, y
+      # gosec no se fía de un valor que no es constante.
+      - path: (csrf/csrf|session/session)\.go
+        linters: [gosec]
+        text: "G124"
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports

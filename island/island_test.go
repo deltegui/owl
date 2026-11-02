@@ -40,8 +40,11 @@ func stateIDOf(t *testing.T, html string) string {
 	if i < 0 {
 		t.Fatalf("no %s in %q", key, html)
 	}
-	rest := html[i+len(key):]
-	return rest[:strings.Index(rest, `"`)]
+	id, _, found := strings.Cut(html[i+len(key):], `"`)
+	if !found {
+		t.Fatalf("the value of %s is not closed in %q", key, html)
+	}
+	return id
 }
 
 func TestTheSameIslandManyTimes(t *testing.T) {

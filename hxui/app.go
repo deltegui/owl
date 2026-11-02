@@ -83,7 +83,7 @@ WebAssembly.instantiateStreaming(fetch(%q), go.importObject).then((r) => go.run(
 // script, and it is the programmer's, never the user's.
 func safeName(name string) string {
 	for _, r := range name {
-		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_' || r == '.') {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '-' && r != '_' && r != '.' {
 			panic(fmt.Sprintf("hxui: %q is not a valid bundle name", name))
 		}
 	}

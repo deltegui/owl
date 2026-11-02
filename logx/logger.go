@@ -99,7 +99,7 @@ func (logger Default) Log(level Level, msg string, args ...any) {
 	case LevelInfo:
 		start = "[INFO]"
 	}
-	start = start + " "
+	start += " "
 	if len(logger.module) != 0 {
 		start = start + "(MODULE: " + logger.module + ") "
 	}
@@ -145,7 +145,6 @@ func (logger Default) Debug(msg string, args ...any) {
 		return
 	}
 	logger.Log(LevelDebug, msg, args...)
-
 }
 
 func (logger Default) DebugContext(ctx context.Context, msg string, args ...any) {

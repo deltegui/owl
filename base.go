@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/deltegui/owl/v3/core"
 	"github.com/deltegui/owl/v3/localizer"
@@ -117,6 +118,9 @@ func (b *base) Listen(address string) {
 	server := http.Server{
 		Addr:    address,
 		Handler: b.router,
+		// Sin esto, quien manda las cabeceras a cuentagotas deja la conexión
+		// abierta para siempre (Slowloris).
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 	go startServer(&server)
 	waitAndStopServer(&server)

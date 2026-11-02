@@ -38,7 +38,7 @@ func NewWithInjector(cy core.Cipher) *Muxi {
 }
 
 func (mux *Muxi) CreateSubMuxi(prefix string) SubMuxi {
-	return &Muxi{base: mux.base.sub(prefix), injector: mux.injector.clone()}
+	return &Muxi{base: mux.sub(prefix), injector: mux.injector.clone()}
 }
 
 // Run is a function that runs a Runner. Show Runner type for more information.

@@ -3,6 +3,7 @@ package owl
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -84,7 +85,7 @@ func New(cy core.Cipher) *Mux {
 }
 
 func (mux *Mux) CreateSubMux(prefix string) SubMux {
-	return &Mux{base: mux.base.sub(prefix)}
+	return &Mux{base: mux.sub(prefix)}
 }
 
 // Handle registers a http Handle to a particular HTTP method and pattern.
@@ -163,8 +164,9 @@ func (mux *Mux) Trace(pattern string, handler Handler, middlewares ...Middleware
 func startServer(server *http.Server) {
 	log.Println("Listening on address: ", server.Addr)
 	log.Println("You are ready to GO!")
-	err := server.ListenAndServe()
-	if err != nil {
+	// Shutdown makes ListenAndServe return ErrServerClosed right away, while it
+	// still waits for the requests in flight: that is not an error.
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalln("Error while listening: ", err)
 	}
 }
@@ -177,12 +179,9 @@ func waitAndStopServer(server *http.Server) {
 	log.Print("Server Stopped")
 	const maxTiemout = 5 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), maxTiemout)
-
-	defer func() {
-		cancel()
-	}()
-
-	if err := server.Shutdown(ctx); err != nil {
+	err := server.Shutdown(ctx)
+	cancel()
+	if err != nil {
 		log.Fatalf("Server shutdown failed:%+v", err)
 	}
 
@@ -200,7 +199,7 @@ func Redirect(to string) Handler {
 // PrintLogo takes a file path and prints your fancy ascii logo.
 // It will fail if your file is not found.
 func PrintLogo(logoFile string) {
-	logo, err := os.ReadFile(logoFile)
+	logo, err := os.ReadFile(logoFile) //nolint:gosec // G304: la ruta la pone el programador al arrancar, no una petición
 	if err != nil {
 		log.Fatalf("Cannot read logo file: %s\n", err)
 	}

@@ -1,6 +1,8 @@
 package middleware_test
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -9,7 +11,9 @@ import (
 
 	"github.com/deltegui/owl/v3"
 	"github.com/deltegui/owl/v3/cipher"
+	"github.com/deltegui/owl/v3/core"
 	"github.com/deltegui/owl/v3/csrf"
+	"github.com/deltegui/owl/v3/logx"
 	"github.com/deltegui/owl/v3/middleware"
 )
 
@@ -58,5 +62,49 @@ func TestFlow(t *testing.T) {
 	h.ServeHTTP(ok, req)
 	if ok.Code != http.StatusOK || *calls != 1 {
 		t.Fatalf("POST with token: %d, handler calls %d", ok.Code, *calls)
+	}
+}
+
+func TestResponsesVaryByCookie(t *testing.T) {
+	h, _ := serve(t)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if got := rec.Header().Values("Vary"); len(got) != 1 || got[0] != "Cookie" {
+		t.Fatalf("Vary = %v: a cache must not share a page that carries a token", got)
+	}
+}
+
+type brokenCipher struct{ core.Cipher }
+
+func (brokenCipher) Encrypt(_, _ []byte) ([]byte, error) { return nil, errors.New("broken") }
+
+type errorLog struct {
+	logx.Default
+	messages []string
+}
+
+func (l *errorLog) WithModuleName(string) logx.Logger { return l }
+func (l *errorLog) ErrorContext(_ context.Context, msg string, _ ...any) {
+	l.messages = append(l.messages, msg)
+}
+
+func TestATokenThatCannotBeMadeIsLoggedAndFailsTheRequest(t *testing.T) {
+	c := brokenCipher{}
+	r := owl.New(c)
+	logger := &errorLog{}
+	r.Logger = logger
+	r.Use(middleware.Csrf(csrf.New(c, csrf.WithSecure(false))))
+	r.Get("/", func(owl.Ctx) error { return nil })
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status %d", rec.Code)
+	}
+	found := false
+	for _, m := range logger.messages {
+		found = found || strings.Contains(m, "error while generating CSRF token")
+	}
+	if !found {
+		t.Fatalf("the failure was not logged: %v", logger.messages)
 	}
 }

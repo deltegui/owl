@@ -21,6 +21,15 @@ const (
 	defaultKeyBytes      uint32 = 32
 )
 
+// Check uses the parameters the hash says it was made with, so a hash that was
+// written by someone else could ask for terabytes of RAM or hours of CPU. A hash that
+// asks for more than this is not read. They are well above what anyone uses (RFC 9106
+// recommends at most 2 GiB; 64 MiB and 3 passes are the defaults here).
+const (
+	maxArgon2Memory uint32 = 1 << 20 // KiB: 1 GiB
+	maxArgon2Time   uint32 = 32
+)
+
 // Argon2 is a core.Hasher with Argon2id. A zero field takes its default, so the zero
 // value works. Every hash made takes Memory of RAM while it runs: if many logins can
 // be at once, limit them, or a flood of requests uses up the memory.
@@ -98,6 +107,9 @@ func parse(encoded string) (parsed, error) {
 	if p.params.Memory == 0 || p.params.Time == 0 || threads == 0 || threads > 255 {
 		return invalid("bad parameters")
 	}
+	if p.params.Memory > maxArgon2Memory || p.params.Time > maxArgon2Time {
+		return invalid("parameters too large")
+	}
 	p.params.Threads = uint8(threads)
 	var err error
 	if p.salt, err = b64.DecodeString(parts[4]); err != nil || len(p.salt) == 0 {
@@ -106,7 +118,8 @@ func parse(encoded string) (parsed, error) {
 	if p.key, err = b64.DecodeString(parts[5]); err != nil || len(p.key) == 0 {
 		return invalid("bad key")
 	}
-	p.params.SaltBytes, p.params.KeyBytes = uint32(len(p.salt)), uint32(len(p.key))
+	// Solo desbordaría con más de 4 GiB de sal o de clave, que salen de un hash guardado.
+	p.params.SaltBytes, p.params.KeyBytes = uint32(len(p.salt)), uint32(len(p.key)) //nolint:gosec // G115: ver arriba
 	return p, nil
 }
 

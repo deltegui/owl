@@ -3,6 +3,7 @@ package mail
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/deltegui/owl/v3/files"
@@ -53,7 +54,8 @@ func TestValidate(t *testing.T) {
 		"bad cc":         {Envelope: Envelope{To: []string{"a@example.com"}, Cc: []string{"x"}}, Payload: 1},
 		"bad reply-to":   {Envelope: Envelope{To: []string{"a@example.com"}, ReplyTo: []string{"x"}}, Payload: 1},
 		"header injection": {
-			Envelope: Envelope{To: []string{"a@example.com\r\nBcc: victim@example.com"}}, Payload: 1},
+			Envelope: Envelope{To: []string{"a@example.com\r\nBcc: victim@example.com"}}, Payload: 1,
+		},
 		"line break": {Envelope: Envelope{To: []string{"a@example.com\n"}}, Payload: 1},
 	}
 	for name, m := range bad {
@@ -104,5 +106,33 @@ func TestDriverReadsAttachmentsFromTemp(t *testing.T) {
 	req.Envelope.Attachments = []string{"../secret"}
 	if err := d.Send(ctx, req, tmp); !errors.Is(err, files.ErrAccessDenied) {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestValidateCountsEveryKindOfRecipient(t *testing.T) {
+	a := []string{"a@example.com"}
+	for name, e := range map[string]Envelope{
+		"to":          {To: a},
+		"cc":          {Cc: a},
+		"bcc":         {Bcc: a},
+		"to and cc":   {To: a, Cc: a},
+		"to and bcc":  {To: a, Bcc: a},
+		"cc and bcc":  {Cc: a, Bcc: a},
+		"all three":   {To: a, Cc: a, Bcc: a},
+		"two of each": {To: append(a, a...), Cc: append(a, a...), Bcc: append(a, a...)},
+	} {
+		if err := (Message{Envelope: e, Payload: 1}).Validate(); err != nil {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+// net/mail already refuses a line break, but the error says why: a header cannot be injected.
+func TestValidateNamesTheLineBreak(t *testing.T) {
+	for _, address := range []string{"a@example.com\r", "a@example.com\n", "a@example.com\r\nBcc: v@example.com", "x\ny@example.com"} {
+		err := (Message{Envelope: Envelope{To: []string{address}}, Payload: 1}).Validate()
+		if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "line break") {
+			t.Errorf("%q: %v", address, err)
+		}
 	}
 }

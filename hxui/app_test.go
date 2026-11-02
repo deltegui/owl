@@ -18,8 +18,10 @@ var counter = island.Define("counter", func(s appState) hx.INode { return hx.P()
 func TestAppHasMetaStateAndLoader(t *testing.T) {
 	in := island.Mount(counter, appState{N: 3})
 	body := serve(t, "/list", func(ctx owl.Ctx) hx.INode {
-		return App(ctx, AppOptions{Title: "T", Bundle: "full", Islands: []island.Instance{in},
-			Scripts: []hx.INode{hx.El("script").Src("/chart.js")}}, hx.Main().Body(in.Node()))
+		return App(ctx, AppOptions{
+			Title: "T", Bundle: "full", Islands: []island.Instance{in},
+			Scripts: []hx.INode{hx.El("script").Src("/chart.js")},
+		}, hx.Main().Body(in.Node()))
 	})
 	order := []string{
 		`window.__hxq`, // the recorder is first

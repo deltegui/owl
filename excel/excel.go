@@ -75,7 +75,7 @@ func (s *Service) SaveTo(ctx context.Context, dir files.Directory, wb Workbook, 
 		pw.CloseWithError(s.generate(ctx, pw, wb)) // nil closes with io.EOF
 	}()
 	rel, err := dir.Write(ctx, path, pr)
-	pr.CloseWithError(err) // if Write stopped early, this frees a generator blocked in a write
+	_ = pr.CloseWithError(err) // if Write stopped early, this frees a generator blocked in a write
 	<-done
 	return rel, err
 }

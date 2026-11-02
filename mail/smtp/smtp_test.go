@@ -49,6 +49,15 @@ type testServer struct {
 	rejectRcpt string
 	hang       bool // accepts the connection and says nothing
 
+	// refuse answers the first word of a command (EHLO, STARTTLS, MAIL, DATA) with this reply.
+	refuse map[string]string
+	// refuseEnd is the answer to the end of the message (instead of "250 queued"): the mail is not kept.
+	refuseEnd string
+	// greeting replaces "220 localhost ready".
+	greeting string
+	quits    atomic.Int32 // QUIT commands received
+	ended    atomic.Int32 // connections the server has finished with
+
 	cert  tls.Certificate
 	pool  *x509.CertPool
 	ln    net.Listener
@@ -134,7 +143,7 @@ func (s *testServer) count() int {
 }
 
 func (s *testServer) handle(conn net.Conn) {
-	defer func() { conn.Close() }()
+	defer func() { conn.Close(); s.ended.Add(1) }()
 	s.conns.Add(1)
 	if s.hang {
 		<-s.done
@@ -153,7 +162,11 @@ func (s *testServer) handle(conn net.Conn) {
 	}
 	mechanism := func(m string) bool { return slices.Contains(strings.Fields(s.auth), m) }
 
-	send("220 localhost ready")
+	if s.greeting != "" {
+		send("%s", s.greeting)
+	} else {
+		send("220 localhost ready")
+	}
 	var cur received
 	for {
 		line, err := r.ReadLine()
@@ -161,6 +174,10 @@ func (s *testServer) handle(conn net.Conn) {
 			return
 		}
 		upper := strings.ToUpper(line)
+		if reply, ok := s.refuse[strings.Fields(upper + " x")[0]]; ok {
+			send("%s", reply)
+			continue
+		}
 		switch {
 		case strings.HasPrefix(upper, "EHLO"):
 			exts := []string{"8BITMIME"}
@@ -229,12 +246,18 @@ func (s *testServer) handle(conn net.Conn) {
 				b.WriteString(strings.TrimPrefix(l, ".") + "\r\n") // dot-unstuffing
 			}
 			cur.data, cur.tls = b.String(), tlsOn
+			if s.refuseEnd != "" {
+				cur = received{user: cur.user, pass: cur.pass}
+				send("%s", s.refuseEnd)
+				continue
+			}
 			s.mu.Lock()
 			s.mails = append(s.mails, cur)
 			s.mu.Unlock()
 			cur = received{user: cur.user, pass: cur.pass}
 			send("250 queued")
 		case upper == "QUIT":
+			s.quits.Add(1)
 			send("221 bye")
 			return
 		default:

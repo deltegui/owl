@@ -146,7 +146,8 @@ ctx.CreateCookieOptions(owl.CookieOptions{
 })
 ```
 
-Path is always `/`. Sessions and the language use their own cookies, see
+Path is always `/` and `SameSite` is always `Lax`: the cookie is not sent in POST requests or
+subrequests that come from another site. Sessions and the language use their own cookies, see
 [authentication](authentication.md) and [localization](localization.md).
 
 ## Localization helpers

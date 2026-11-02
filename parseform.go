@@ -52,9 +52,9 @@ const multipartFormMaxSize = 64 << 20 // 20MB
 func (ctx Ctx) ParseForm(dst any) {
 	contentType := ctx.Req.Header.Get("Content-Type")
 	if strings.HasPrefix(contentType, "multipart/form-data") && ctx.Req.Form == nil {
-		ctx.Req.ParseMultipartForm(multipartFormMaxSize)
+		_ = ctx.Req.ParseMultipartForm(multipartFormMaxSize)
 	} else if ctx.Req.Form == nil {
-		ctx.Req.ParseForm()
+		_ = ctx.Req.ParseForm()
 	}
 
 	v := reflect.ValueOf(dst)
@@ -90,7 +90,7 @@ func (ctx Ctx) ParseForm(dst any) {
 func setValue(field reflect.Value, value string) bool {
 	t := field.Type()
 	isPointer := false
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
 		isPointer = true
 	}
